@@ -53,7 +53,7 @@ export interface CalendarBlock {
   created_at: string
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE_URL = "http://localhost:4000"
 
 class ApiService {
   private async fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -78,7 +78,7 @@ class ApiService {
       status: string
       database_connected: boolean
       timestamp: string
-    }>("/health")
+    }>("/api/health")
   }
 
   // Get all meetings
@@ -88,7 +88,7 @@ class ApiService {
       meetings: Meeting[]
       total_meetings: number
       timestamp: string
-    }>("/meetings")
+    }>("/api/meetings")
   }
 
   // Get user calendar
@@ -99,12 +99,12 @@ class ApiService {
       calendar_blocks: CalendarBlock[]
       total_blocks: number
       timestamp: string
-    }>(`/calendar/${userId}`)
+    }>(`/api/calendar/${userId}`)
   }
 
   // Negotiate meeting (find available slots)
   async negotiateMeeting(request: MeetingRequest): Promise<NegotiationResult> {
-    return this.fetchApi<NegotiationResult>("/negotiate", {
+    return this.fetchApi<NegotiationResult>("/api/negotiate", {
       method: "POST",
       body: JSON.stringify(request),
     })
@@ -112,7 +112,7 @@ class ApiService {
 
   // Schedule meeting
   async scheduleMeeting(request: MeetingRequest, slotIndex = 0): Promise<NegotiationResult> {
-    return this.fetchApi<NegotiationResult>(`/schedule?slot_index=${slotIndex}`, {
+    return this.fetchApi<NegotiationResult>(`/api/schedule?slot_index=${slotIndex}`, {
       method: "POST",
       body: JSON.stringify(request),
     })

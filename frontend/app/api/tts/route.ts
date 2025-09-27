@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     // Initialize Cartesia client
     const client = new CartesiaClient({
-      apiKey: process.env.NEXT_PUBLIC_CARTESIA_API_KEY || "sk_car_ujiEjhXwke5raWiF4kTMzn",
+      apiKey: "sk_car_ujiEjhXwke5raWiF4kTMzn",
     });
 
     // Make the TTS API call

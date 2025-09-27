@@ -9,14 +9,10 @@ import { Mic, MicOff, Volume2, Send, Calendar, VolumeX } from "lucide-react"
 import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/api"
 import { ttsService } from "@/lib/tts-service"
 import { audioRecorderService } from "@/lib/audio-recorder-service"
+import { voiceService } from "@/lib/voice-service"
 import { VoiceVisualizer } from "./voice-visualizer"
 
-declare global {
-  interface Window {
-    SpeechRecognition?: any
-    webkitSpeechRecognition?: any
-  }
-}
+// Speech Recognition types are handled by the DOM lib
 
 export function VoiceInterface() {
   const [isListening, setIsListening] = useState(false)
@@ -43,7 +39,7 @@ export function VoiceInterface() {
       recognition.current.interimResults = true
       recognition.current.lang = "en-US"
 
-      recognition.current.onresult = (event) => {
+      recognition.current.onresult = (event: any) => {
         let finalTranscript = ""
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
@@ -52,11 +48,12 @@ export function VoiceInterface() {
         }
         if (finalTranscript) {
           setTranscript((prev) => prev + " " + finalTranscript)
-          parseVoiceCommand(finalTranscript)
+          // Use fallback for real-time parsing, full orchestration on recording complete
+          parseVoiceCommandFallback(finalTranscript)
         }
       }
 
-      recognition.current.onerror = (event) => {
+      recognition.current.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error)
         setIsListening(false)
       }
@@ -67,7 +64,53 @@ export function VoiceInterface() {
     }
   }, [])
 
-  const parseVoiceCommand = (command: string) => {
+  const handleVoiceOrchestration = async (transcript: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Send to Gemini-powered orchestrator instead of local parsing
+      console.log("Sending transcript to voice orchestrator:", transcript)
+      const result = await voiceService.processVoiceCommand(transcript, "schedule")
+      
+      console.log("Voice orchestrator response:", result)
+      
+      // Update meeting request from Gemini's structured output
+      if (result.context?.originalRequest) {
+        setMeetingRequest(result.context.originalRequest)
+      }
+      
+      // Set negotiation result for UI display
+      if (result.context?.negotiationResult) {
+        setNegotiationResult(result.context.negotiationResult)
+      }
+      
+      // Speak the AI-generated response
+      if (result.spokenResponse) {
+        console.log("Speaking AI response:", result.spokenResponse)
+        setIsSpeaking(true)
+        try {
+          await ttsService.textToSpeechSimple(result.spokenResponse)
+        } catch (ttsError) {
+          console.error("TTS failed, using browser fallback:", ttsError)
+          handleFallbackTTS(result.spokenResponse)
+        }
+        setIsSpeaking(false)
+      }
+      
+    } catch (err) {
+      console.error("Voice orchestration failed:", err)
+      setError(err instanceof Error ? err.message : "Voice command processing failed")
+      
+      // Fallback to local parsing if orchestrator fails
+      parseVoiceCommandFallback(transcript)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fallback parsing (simplified version of original)
+  const parseVoiceCommandFallback = (command: string) => {
     const lowerCommand = command.toLowerCase()
 
     // Extract meeting title
@@ -76,7 +119,7 @@ export function VoiceInterface() {
       setMeetingRequest((prev) => ({ ...prev, title: titleMatch[1] }))
     }
 
-    // Extract date
+    // Extract date  
     if (lowerCommand.includes("tomorrow")) {
       const tomorrow = new Date()
       tomorrow.setDate(tomorrow.getDate() + 1)
@@ -99,16 +142,6 @@ export function VoiceInterface() {
       const timeString = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
       setMeetingRequest((prev) => ({ ...prev, preferred_time: timeString }))
     }
-
-    // Extract duration
-    const durationMatch = lowerCommand.match(/(\d+)\s*(?:minute|min|hour|hr)/)
-    if (durationMatch) {
-      let duration = Number.parseInt(durationMatch[1])
-      if (lowerCommand.includes("hour") || lowerCommand.includes("hr")) {
-        duration *= 60
-      }
-      setMeetingRequest((prev) => ({ ...prev, duration_minutes: duration }))
-    }
   }
 
   const toggleListening = async () => {
@@ -126,8 +159,8 @@ export function VoiceInterface() {
         console.log("Transcription received:", transcribedText)
         
         if (transcribedText.trim()) {
-          setTranscript(transcribedText) // Replace instead of appending
-          parseVoiceCommand(transcribedText)
+          setTranscript(transcribedText)
+          await handleVoiceOrchestration(transcribedText)
         }
         
         setIsRecording(false)
@@ -225,9 +258,10 @@ export function VoiceInterface() {
     }
   }
 
-  const handleFallbackTTS = () => {
+  const handleFallbackTTS = (text?: string) => {
+    const textToSpeak = text || transcript
     if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(transcript)
+      const utterance = new SpeechSynthesisUtterance(textToSpeak)
       utterance.rate = 0.9
       utterance.pitch = 1
       utterance.volume = 1

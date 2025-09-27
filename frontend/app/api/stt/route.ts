@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       const cartesiaResponse = await fetch("https://api.cartesia.ai/audio/transcriptions", {
         method: "POST",
         headers: {
-          "X-API-Key": process.env.NEXT_PUBLIC_CARTESIA_API_KEY || "sk_car_ujiEjhXwke5raWiF4kTMzn",
+          "X-API-Key": "sk_car_ujiEjhXwke5raWiF4kTMzn",
         },
         body: cartesiaFormData,
       });
