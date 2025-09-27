@@ -280,11 +280,11 @@ def setup_database():
         for day in range(31):
             current_date = now + timedelta(days=day)
             day_of_week = current_date.weekday()  # 0=Monday, 6=Sunday
-            
+
             # Skip weekends for work schedules
             if day_of_week >= 5:  # Saturday or Sunday
                 continue
-                
+
             # Alice's schedule (focused personality - software engineer)
             alice_blocks = generate_alice_daily_schedule(current_date, day)
             alice_calendar.extend(alice_blocks)
