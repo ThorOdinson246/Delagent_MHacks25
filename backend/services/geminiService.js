@@ -1,11 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// The API key will be provided by the execution environment.
-// Leave GEMINI_API_KEY blank if you are running in a managed environment that provides it.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
-if (!GEMINI_API_KEY) {
-    console.warn("GEMINI_API_KEY is not set. Using a placeholder. This will fail unless run in a managed environment.");
+if (!GEMINI_API_KEY || GEMINI_API_KEY === "your_secure_gemini_api_key_here") {
+    console.error("❌ GEMINI_API_KEY is not configured. Please set a valid API key in .env file.");
+    console.error("   Get your API key from: https://ai.google.dev/");
+    throw new Error("Gemini API key is required but not configured");
 }
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -53,7 +53,10 @@ export async function extractMeetingIntent(transcript) {
         return JSON.parse(cleanedText);
     } catch (error) {
         console.error("Error extracting meeting intent from Gemini:", error);
-        throw new Error("Failed to understand meeting details from the transcript.");
+        if (error.message?.includes('API_KEY')) {
+            throw new Error("Gemini API authentication failed. Please check your API key.");
+        }
+        throw new Error("Failed to understand meeting details from the transcript: " + error.message);
     }
 }
 
@@ -89,7 +92,10 @@ export async function generateSpokenResponse(negotiationResult) {
         return response.text().trim();
     } catch (error) {
         console.error("Error generating spoken response from Gemini:", error);
-        throw new Error("Failed to generate a spoken response.");
+        if (error.message?.includes('API_KEY')) {
+            throw new Error("Gemini API authentication failed. Please check your API key.");
+        }
+        throw new Error("Failed to generate a spoken response: " + error.message);
     }
 }
 
