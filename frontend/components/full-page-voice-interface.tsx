@@ -202,7 +202,7 @@ export function FullPageVoiceInterface({ onMinimize }: FullPageVoiceInterfacePro
         )}
 
         {/* Controls */}
-        <div className="mt-12 flex gap-6">
+        <div className="mt-12 flex justify-center">
           <Button
             size="lg"
             onClick={toggleListening}
@@ -233,24 +233,7 @@ export function FullPageVoiceInterface({ onMinimize }: FullPageVoiceInterfacePro
             )}
           </Button>
 
-          <Button
-            size="lg"
-            onClick={handleTextToSpeech}
-            disabled={!transcript.trim() || isSpeaking}
-            className="px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600"
-          >
-            {isSpeaking ? (
-              <>
-                <VolumeX className="w-6 h-6 mr-3" />
-                Speaking...
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-6 h-6 mr-3" />
-                Speak Text
-              </>
-            )}
-          </Button>
+
         </div>
 
         {/* Enhanced Transcript */}

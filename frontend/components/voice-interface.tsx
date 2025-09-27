@@ -327,7 +327,7 @@ export function VoiceInterface({ onExpand }: { onExpand?: () => void }) {
         )}
 
         {/* Controls */}
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center">
           <Button
             size="lg"
             onClick={toggleListening}
@@ -358,24 +358,7 @@ export function VoiceInterface({ onExpand }: { onExpand?: () => void }) {
             )}
           </Button>
 
-          <Button
-            size="lg"
-            onClick={handleTextToSpeech}
-            disabled={!transcript.trim() || isSpeaking}
-            className="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600"
-          >
-            {isSpeaking ? (
-              <>
-                <VolumeX className="w-5 h-5 mr-2" />
-                Speaking...
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-5 h-5 mr-2" />
-                Speak Text
-              </>
-            )}
-          </Button>
+
         </div>
 
         {/* Enhanced Transcript */}
