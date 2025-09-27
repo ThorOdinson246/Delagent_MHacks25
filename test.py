@@ -63,22 +63,46 @@ class InteractiveNegotiation:
         if not title:
             title = "Meeting with Alice"
         
+        # Determine if meeting is with AI agent or external person
+        print("\n🤖 Meeting Type:")
+        print("   1. With AI Agent (internal colleague - Alice)")
+        print("   2. External Person (no AI agent)")
+        while True:
+            meeting_type = input("Select meeting type (1 or 2): ").strip()
+            if meeting_type in ['1', '2']:
+                break
+            print("❌ Please enter 1 or 2")
+        
+        is_ai_agent_meeting = meeting_type == '1'
+        
         # Get date input
-        print("\n📅 Date (format: YYYY-MM-DD, e.g., 2025-09-30)")
-        print("   Valid dates: 2025-09-27 to 2025-10-26 (weekdays only)")
+        today = datetime.now().date()
+        print(f"\n📅 Date (format: YYYY-MM-DD, e.g., 2025-09-30)")
+        print(f"   Valid dates: {today.strftime('%Y-%m-%d')} to 2025-10-27 (weekdays only, no past dates)")
+
         while True:
             date_str = input("Preferred date: ").strip()
             try:
                 preferred_date = datetime.strptime(date_str, "%Y-%m-%d")
+                
+                # Check if it's a weekend
                 if preferred_date.weekday() >= 5:  # Weekend
-                    print("❌ Please select a weekday (Monday-Friday)")
+                    day_name = preferred_date.strftime("%A")
+                    print(f"❌ {day_name} is a weekend. Please select a weekday (Monday-Friday)")
                     continue
-                if preferred_date < datetime(2025, 9, 27) or preferred_date > datetime(2025, 10, 26):
-                    print("❌ Date must be between 2025-09-27 and 2025-10-26")
+                
+                # Check date range (no past dates, only future dates)
+                today = datetime.now().date()
+                if preferred_date.date() < today:
+                    print(f"❌ Date cannot be in the past. Today is {today.strftime('%Y-%m-%d')}")
                     continue
+                if preferred_date > datetime(2025, 10, 27):
+                    print("❌ Date must be before 2025-10-27")
+                    continue
+                
                 break
             except ValueError:
-                print("❌ Invalid date format. Use YYYY-MM-DD")
+                print("❌ Invalid date format. Use YYYY-MM-DD (e.g., 2025-09-30)")
         
         # Get time input
         print("\n⏰ Time (format: HH:MM, e.g., 14:30)")
@@ -119,19 +143,43 @@ class InteractiveNegotiation:
         return {
             "title": title,
             "preferred_datetime": preferred_datetime,
-            "duration_minutes": duration
+            "duration_minutes": duration,
+            "is_ai_agent_meeting": is_ai_agent_meeting
         }
     
     async def find_available_slots(self, user_prefs: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Find available time slots for both users"""
-        print(f"\n🔍 Searching for available slots...")
+        """Find available time slots with proper AI agent negotiation"""
+        preferred_time = user_prefs["preferred_datetime"]
+        duration = user_prefs["duration_minutes"]
+        is_ai_agent_meeting = user_prefs["is_ai_agent_meeting"]
+        
+        if is_ai_agent_meeting:
+            return await self.negotiate_with_ai_agent(user_prefs)
+        else:
+            return await self.find_external_meeting_slots(user_prefs)
+    
+    async def negotiate_with_ai_agent(self, user_prefs: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """AI Agent negotiation between Pappu and Alice"""
+        print(f"\n🤖 AI Agent Negotiation Starting...")
+        print(f"   Pappu's Agent: Initiating meeting request")
+        print(f"   Alice's Agent: Analyzing availability")
         
         preferred_time = user_prefs["preferred_datetime"]
         duration = user_prefs["duration_minutes"]
         
-        # Search window: 3 days before and after preferred date
-        search_start = preferred_time - timedelta(days=3)
-        search_end = preferred_time + timedelta(days=3)
+        # Check if preferred time is within business hours
+        if preferred_time.hour >= 17 or preferred_time.hour < 8:
+            print(f"   ⚠️  Pappu's Agent: {preferred_time.strftime('%H:%M')} is outside business hours (8:00-17:00)")
+            print(f"   🔄 Pappu's Agent: Requesting alternative time negotiation")
+        
+        # Search window: 5 days before and after preferred date for better negotiation
+        # But ensure we don't search before today or beyond database range
+        today = datetime.now().date()
+        db_end_date = datetime(2025, 10, 27).date()
+        search_start = max(preferred_time - timedelta(days=5), datetime.combine(today, datetime.min.time()))
+        search_end = min(preferred_time + timedelta(days=5), datetime.combine(db_end_date, datetime.max.time()))
+        
+        print(f"   🔍 Both agents: Searching 5 days before/after preferred date")
         
         available_slots = []
         
@@ -174,7 +222,88 @@ class InteractiveNegotiation:
         # Sort by quality score (higher is better)
         available_slots.sort(key=lambda x: x["quality_score"], reverse=True)
         
-        return available_slots[:5]  # Return top 5 options
+        # AI Agent negotiation results
+        if available_slots:
+            best_slot = available_slots[0]
+            print(f"   ✅ Alice's Agent: Found {len(available_slots)} available slots")
+            print(f"   🎯 Best Option: {best_slot['start_time'].strftime('%A, %Y-%m-%d at %H:%M')} (Score: {best_slot['quality_score']})")
+            print(f"   📋 Alice's Agent: Providing top 3 options for Pappu's consideration")
+        else:
+            print(f"   ❌ Alice's Agent: No available slots found in search window")
+            print(f"   💬 Alice's Agent: Suggesting to expand search or reschedule")
+        
+        return available_slots[:3]  # Return top 3 options for AI agent negotiation
+    
+    async def find_external_meeting_slots(self, user_prefs: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Find slots for external meetings (only Pappu's schedule)"""
+        print(f"\n👤 External Meeting Scheduling")
+        print(f"   Pappu's Agent: Checking personal availability only")
+        
+        preferred_time = user_prefs["preferred_datetime"]
+        duration = user_prefs["duration_minutes"]
+        
+        # Check if preferred time is within business hours
+        if preferred_time.hour >= 17 or preferred_time.hour < 8:
+            print(f"   ⚠️  Pappu's Agent: {preferred_time.strftime('%H:%M')} is outside business hours (8:00-17:00)")
+            print(f"   🔄 Pappu's Agent: Finding alternative times")
+        
+        # Search window: 3 days before and after preferred date
+        # But ensure we don't search before today or beyond database range
+        today = datetime.now().date()
+        db_end_date = datetime(2025, 10, 27).date()
+        search_start = max(preferred_time - timedelta(days=3), datetime.combine(today, datetime.min.time()))
+        search_end = min(preferred_time + timedelta(days=3), datetime.combine(db_end_date, datetime.max.time()))
+        
+        print(f"   🔍 Pappu's Agent: Searching 3 days before/after preferred date")
+        
+        available_slots = []
+        
+        # Check each day in the search window
+        current_date = search_start.date()
+        end_date = search_end.date()
+        
+        while current_date <= end_date:
+            # Skip weekends
+            if current_date.weekday() >= 5:
+                current_date += timedelta(days=1)
+                continue
+            
+            # Check each hour from 8 AM to 5 PM
+            for hour in range(8, 17):
+                for minute in [0, 15, 30, 45]:
+                    test_start = datetime.combine(current_date, datetime.min.time().replace(hour=hour, minute=minute))
+                    test_end = test_start + timedelta(minutes=duration)
+                    
+                    # Skip if it goes past 5 PM
+                    if test_end.hour >= 17:
+                        continue
+                    
+                    # Check availability for Pappu only
+                    pappu_conflicts = await self.calendar_service.check_time_conflict("bob", test_start, test_end)
+                    
+                    if not pappu_conflicts:
+                        # Calculate quality score
+                        quality_score = self.calculate_slot_quality(test_start, preferred_time)
+                        available_slots.append({
+                            "start_time": test_start,
+                            "end_time": test_end,
+                            "quality_score": quality_score,
+                            "duration_minutes": duration
+                        })
+            
+            current_date += timedelta(days=1)
+        
+        # Sort by quality score (higher is better)
+        available_slots.sort(key=lambda x: x["quality_score"], reverse=True)
+        
+        if available_slots:
+            best_slot = available_slots[0]
+            print(f"   ✅ Pappu's Agent: Found {len(available_slots)} available slots")
+            print(f"   🎯 Best Option: {best_slot['start_time'].strftime('%A, %Y-%m-%d at %H:%M')} (Score: {best_slot['quality_score']})")
+        else:
+            print(f"   ❌ Pappu's Agent: No available slots found")
+        
+        return available_slots[:3]  # Return top 3 options
     
     def calculate_slot_quality(self, slot_time: datetime, preferred_time: datetime) -> int:
         """Calculate quality score for a time slot"""
@@ -211,21 +340,55 @@ class InteractiveNegotiation:
         
         return score
     
-    def display_available_slots(self, slots: List[Dict[str, Any]]) -> None:
-        """Display available time slots to user"""
+    def display_available_slots(self, slots: List[Dict[str, Any]], is_ai_agent_meeting: bool = True) -> str:
+        """Display available time slots to user. Returns 'restart' if user wants to restart, None otherwise"""
         if not slots:
-            print("\n❌ No available time slots found in the search window")
-            return
+            if is_ai_agent_meeting:
+                print("\n❌ AI Agent Negotiation: No available time slots found")
+                print("   💬 Both agents suggest expanding search window or rescheduling")
+            else:
+                print("\n❌ External Meeting: No available time slots found")
+                print("   💬 Pappu's agent suggests checking different dates")
+            
+            # Ask user if they want to restart
+            while True:
+                restart_choice = input("\n🔄 Would you like to restart with new preferences? (y/n): ").strip().lower()
+                if restart_choice in ['y', 'yes']:
+                    print("🔄 Restarting meeting scheduler...")
+                    return "restart"
+                elif restart_choice in ['n', 'no']:
+                    return None
+                else:
+                    print("❌ Please enter 'y' for yes or 'n' for no")
+            return None
         
-        print(f"\n✅ Found {len(slots)} available time slots:")
-        print("-" * 50)
+        if is_ai_agent_meeting:
+            print(f"\n🤖 AI Agent Negotiation Results:")
+            print(f"   📋 Alice's Agent: Found {len(slots)} mutually available slots")
+            print(f"   🎯 Pappu's Agent: Please select your preferred option")
+        else:
+            print(f"\n👤 External Meeting Results:")
+            print(f"   📋 Pappu's Agent: Found {len(slots)} available slots")
+            print(f"   🎯 Please select your preferred option")
+        
+        print("-" * 60)
         
         for i, slot in enumerate(slots, 1):
             start_time = slot["start_time"]
             end_time = slot["end_time"]
             quality = slot["quality_score"]
             
-            print(f"{i}. {start_time.strftime('%A, %Y-%m-%d at %H:%M')} - {end_time.strftime('%H:%M')}")
+            # Add recommendation indicator
+            if i == 1:
+                recommendation = "⭐ RECOMMENDED"
+            elif i == 2:
+                recommendation = "🔄 ALTERNATIVE 1"
+            elif i == 3:
+                recommendation = "🔄 ALTERNATIVE 2"
+            else:
+                recommendation = ""
+            
+            print(f"{i}. {start_time.strftime('%A, %Y-%m-%d at %H:%M')} - {end_time.strftime('%H:%M')} {recommendation}")
             print(f"   Duration: {slot['duration_minutes']} minutes | Quality Score: {quality}")
             print()
     
@@ -312,24 +475,32 @@ class InteractiveNegotiation:
         if not await self.setup_database():
             return False
         
-        # Get user preferences
-        self.user_preferences = self.get_user_input()
-        
-        # Find available slots
-        self.available_slots = await self.find_available_slots(self.user_preferences)
-        
-        # Display options
-        self.display_available_slots(self.available_slots)
-        
-        # Get user selection
-        selected_slot = self.get_user_selection(self.available_slots)
-        
-        if selected_slot:
-            # Schedule the meeting
-            return await self.schedule_meeting(selected_slot, self.user_preferences)
-        else:
-            print("\n👋 Meeting scheduling cancelled")
-            return False
+        while True:
+            # Get user preferences
+            self.user_preferences = self.get_user_input()
+            
+            # Find available slots
+            self.available_slots = await self.find_available_slots(self.user_preferences)
+            
+            # Display options and check for restart request
+            restart_signal = self.display_available_slots(self.available_slots, self.user_preferences["is_ai_agent_meeting"])
+            
+            if restart_signal == "restart":
+                continue  # Restart the loop with new preferences
+            
+            if not self.available_slots:
+                print("\n👋 Meeting scheduling cancelled")
+                return False
+            
+            # Get user selection
+            selected_slot = self.get_user_selection(self.available_slots)
+            
+            if selected_slot:
+                # Schedule the meeting
+                return await self.schedule_meeting(selected_slot, self.user_preferences)
+            else:
+                print("\n👋 Meeting scheduling cancelled")
+                return False
 
 async def main():
     """Main function"""

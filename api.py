@@ -29,6 +29,7 @@ class MeetingRequest(BaseModel):
     preferred_date: str  # YYYY-MM-DD format
     preferred_time: str  # HH:MM format
     duration_minutes: int
+    is_ai_agent_meeting: bool = True  # Default to AI agent meeting
 
 class TimeSlot(BaseModel):
     start_time: str
@@ -82,9 +83,14 @@ class APINegotiation:
             # Validate date
             preferred_date = datetime.strptime(request.preferred_date, "%Y-%m-%d")
             if preferred_date.weekday() >= 5:  # Weekend
-                return False, "Date must be a weekday (Monday-Friday)"
-            if preferred_date < datetime(2025, 9, 27) or preferred_date > datetime(2025, 10, 26):
-                return False, "Date must be between 2025-09-27 and 2025-10-26"
+                day_name = preferred_date.strftime("%A")
+                return False, f"{day_name} is a weekend. Date must be a weekday (Monday-Friday)"
+            # Check date range (no past dates, only future dates)
+            today = datetime.now().date()
+            if preferred_date.date() < today:
+                return False, f"Date cannot be in the past. Today is {today.strftime('%Y-%m-%d')}"
+            if preferred_date > datetime(2025, 10, 27):
+                return False, "Date must be before 2025-10-27"
             
             # Validate time
             preferred_time = datetime.strptime(request.preferred_time, "%H:%M")
@@ -101,7 +107,7 @@ class APINegotiation:
             return False, f"Invalid format: {str(e)}"
     
     async def find_available_slots(self, request: MeetingRequest) -> List[Dict[str, Any]]:
-        """Find available time slots for both users"""
+        """Find available time slots with proper AI agent negotiation"""
         preferred_date = datetime.strptime(request.preferred_date, "%Y-%m-%d")
         preferred_time = datetime.strptime(request.preferred_time, "%H:%M")
         preferred_datetime = preferred_date.replace(
@@ -113,9 +119,19 @@ class APINegotiation:
         
         duration = request.duration_minutes
         
-        # Search window: 3 days before and after preferred date
-        search_start = preferred_datetime - timedelta(days=3)
-        search_end = preferred_datetime + timedelta(days=3)
+        if request.is_ai_agent_meeting:
+            return await self.negotiate_with_ai_agent_api(preferred_datetime, duration)
+        else:
+            return await self.find_external_meeting_slots_api(preferred_datetime, duration)
+    
+    async def negotiate_with_ai_agent_api(self, preferred_datetime: datetime, duration: int) -> List[Dict[str, Any]]:
+        """AI Agent negotiation between Pappu and Alice (API version)"""
+        # Search window: 5 days before and after preferred date for better negotiation
+        # But ensure we don't search before today or beyond database range
+        today = datetime.now().date()
+        db_end_date = datetime(2025, 10, 27).date()
+        search_start = max(preferred_datetime - timedelta(days=5), datetime.combine(today, datetime.min.time()))
+        search_end = min(preferred_datetime + timedelta(days=5), datetime.combine(db_end_date, datetime.max.time()))
         
         available_slots = []
         
@@ -158,7 +174,58 @@ class APINegotiation:
         # Sort by quality score (higher is better)
         available_slots.sort(key=lambda x: x["quality_score"], reverse=True)
         
-        return available_slots[:5]  # Return top 5 options
+        return available_slots[:3]  # Return top 3 options for AI agent negotiation
+    
+    async def find_external_meeting_slots_api(self, preferred_datetime: datetime, duration: int) -> List[Dict[str, Any]]:
+        """Find slots for external meetings (only Pappu's schedule) - API version"""
+        # Search window: 3 days before and after preferred date
+        # But ensure we don't search before today or beyond database range
+        today = datetime.now().date()
+        db_end_date = datetime(2025, 10, 27).date()
+        search_start = max(preferred_datetime - timedelta(days=3), datetime.combine(today, datetime.min.time()))
+        search_end = min(preferred_datetime + timedelta(days=3), datetime.combine(db_end_date, datetime.max.time()))
+        
+        available_slots = []
+        
+        # Check each day in the search window
+        current_date = search_start.date()
+        end_date = search_end.date()
+        
+        while current_date <= end_date:
+            # Skip weekends
+            if current_date.weekday() >= 5:
+                current_date += timedelta(days=1)
+                continue
+            
+            # Check each hour from 8 AM to 5 PM
+            for hour in range(8, 17):
+                for minute in [0, 15, 30, 45]:
+                    test_start = datetime.combine(current_date, datetime.min.time().replace(hour=hour, minute=minute))
+                    test_end = test_start + timedelta(minutes=duration)
+                    
+                    # Skip if it goes past 5 PM
+                    if test_end.hour >= 17:
+                        continue
+                    
+                    # Check availability for Pappu only
+                    pappu_conflicts = await self.calendar_service.check_time_conflict("bob", test_start, test_end)
+                    
+                    if not pappu_conflicts:
+                        # Calculate quality score
+                        quality_score = self.calculate_slot_quality(test_start, preferred_datetime)
+                        available_slots.append({
+                            "start_time": test_start,
+                            "end_time": test_end,
+                            "quality_score": quality_score,
+                            "duration_minutes": duration
+                        })
+            
+            current_date += timedelta(days=1)
+        
+        # Sort by quality score (higher is better)
+        available_slots.sort(key=lambda x: x["quality_score"], reverse=True)
+        
+        return available_slots[:3]  # Return top 3 options
     
     def calculate_slot_quality(self, slot_time: datetime, preferred_time: datetime) -> int:
         """Calculate quality score for a time slot"""
@@ -350,7 +417,6 @@ async def negotiate_meeting(request: MeetingRequest):
         
         # Find available slots
         available_slots = await negotiation.find_available_slots(request)
-        formatted_slots = negotiation.format_slots_for_api(available_slots)
         
         # Calculate search window
         preferred_date = datetime.strptime(request.preferred_date, "%Y-%m-%d")
@@ -362,8 +428,35 @@ async def negotiate_meeting(request: MeetingRequest):
             microsecond=0
         )
         
-        search_start = preferred_datetime - timedelta(days=3)
-        search_end = preferred_datetime + timedelta(days=3)
+        # Calculate search window based on meeting type
+        today = datetime.now().date()
+        db_end_date = datetime(2025, 10, 27).date()
+        
+        if request.is_ai_agent_meeting:
+            search_start = max(preferred_datetime - timedelta(days=5), datetime.combine(today, datetime.min.time()))
+            search_end = min(preferred_datetime + timedelta(days=5), datetime.combine(db_end_date, datetime.max.time()))
+        else:
+            search_start = max(preferred_datetime - timedelta(days=3), datetime.combine(today, datetime.min.time()))
+            search_end = min(preferred_datetime + timedelta(days=3), datetime.combine(db_end_date, datetime.max.time()))
+        
+        # Handle case when no slots are found
+        if not available_slots:
+            return NegotiationResult(
+                success=False,
+                meeting_request=request,
+                available_slots=[],
+                total_slots_found=0,
+                search_window={
+                    "start": search_start.isoformat(),
+                    "end": search_end.isoformat()
+                },
+                selected_slot=None,
+                meeting_id=None,
+                message="No available time slots found. Consider trying different dates or times.",
+                timestamp=datetime.now().isoformat()
+            )
+        
+        formatted_slots = negotiation.format_slots_for_api(available_slots)
         
         return NegotiationResult(
             success=True,
@@ -403,10 +496,13 @@ async def schedule_meeting(request: MeetingRequest, slot_index: int = 0):
                 meeting_request=request,
                 available_slots=[],
                 total_slots_found=0,
-                search_window={},
+                search_window={
+                    "start": search_start.isoformat(),
+                    "end": search_end.isoformat()
+                },
                 selected_slot=None,
                 meeting_id=None,
-                message="No available time slots found",
+                message="No available time slots found. Consider trying different dates or times.",
                 timestamp=datetime.now().isoformat()
             )
         

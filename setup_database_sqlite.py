@@ -276,8 +276,8 @@ def setup_database():
         alice_calendar = []
         bob_calendar = []
         
-        # Generate realistic schedules for 30 days
-        for day in range(30):
+        # Generate realistic schedules for 31 days (exactly 1 month from 2025-09-27 to 2025-10-27)
+        for day in range(31):
             current_date = now + timedelta(days=day)
             day_of_week = current_date.weekday()  # 0=Monday, 6=Sunday
             
