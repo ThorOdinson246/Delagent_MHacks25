@@ -9,6 +9,7 @@ import { Mic, MicOff, Volume2, Send, Calendar, VolumeX } from "lucide-react"
 import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/api"
 import { ttsService } from "@/lib/tts-service"
 import { audioRecorderService } from "@/lib/audio-recorder-service"
+import { VoiceVisualizer } from "./voice-visualizer"
 
 declare global {
   interface Window {
@@ -125,7 +126,7 @@ export function VoiceInterface() {
         console.log("Transcription received:", transcribedText)
         
         if (transcribedText.trim()) {
-          setTranscript((prev) => (prev ? prev + " " : "") + transcribedText)
+          setTranscript(transcribedText) // Replace instead of appending
           parseVoiceCommand(transcribedText)
         }
         
@@ -260,28 +261,8 @@ export function VoiceInterface() {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Voice Visualization */}
-        <div className="relative h-32 bg-muted/20 rounded-lg flex items-center justify-center overflow-hidden">
-          {isRecording ? (
-            <div className="flex items-center gap-1">
-              {[...Array(12)].map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1 bg-gradient-to-t from-red-500 to-orange-500 rounded-full animate-pulse"
-                  style={{
-                    height: `${Math.random() * 60 + 20}px`,
-                    animationDelay: `${i * 0.1}s`,
-                  }}
-                />
-              ))}
-            </div>
-          ) : isListening ? (
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <span className="text-muted-foreground">Processing audio...</span>
-            </div>
-          ) : (
-            <div className="text-muted-foreground">Click to start recording</div>
-          )}
+        <div className="relative h-40 bg-muted/20 rounded-lg flex items-center justify-center overflow-hidden">
+          <VoiceVisualizer isRecording={isRecording} isProcessing={isListening} />
         </div>
 
         {/* Controls */}
