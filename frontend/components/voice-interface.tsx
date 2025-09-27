@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mic, MicOff, Volume2, Send, Calendar } from "lucide-react"
+import { Mic, MicOff, Volume2, Send, Calendar, VolumeX } from "lucide-react"
 import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/api"
+import { ttsService } from "@/lib/tts-service"
+import { audioRecorderService } from "@/lib/audio-recorder-service"
 
 declare global {
   interface Window {
@@ -27,6 +29,8 @@ export function VoiceInterface() {
   const [negotiationResult, setNegotiationResult] = useState<NegotiationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
 
   const recognition = useRef<any | null>(null)
 
@@ -106,19 +110,55 @@ export function VoiceInterface() {
     }
   }
 
-  const toggleListening = () => {
-    if (!recognition.current) {
-      setError("Speech recognition not supported in this browser")
-      return
-    }
-
-    if (isListening) {
-      recognition.current.stop()
-      setIsListening(false)
+  const toggleListening = async () => {
+    if (isRecording) {
+      // Stop recording and process audio
+      try {
+        setIsListening(true) // Show processing state
+        setError(null)
+        console.log("Stopping recording...")
+        
+        const audioBlob = await audioRecorderService.stopRecording()
+        console.log("Audio recorded, sending for transcription...")
+        
+        const transcribedText = await audioRecorderService.sendAudioToSTT(audioBlob)
+        console.log("Transcription received:", transcribedText)
+        
+        if (transcribedText.trim()) {
+          setTranscript((prev) => (prev ? prev + " " : "") + transcribedText)
+          parseVoiceCommand(transcribedText)
+        }
+        
+        setIsRecording(false)
+        setIsListening(false)
+      } catch (err) {
+        console.error("Failed to process recording:", err)
+        setError(err instanceof Error ? err.message : "Failed to process recording")
+        setIsRecording(false)
+        setIsListening(false)
+      }
     } else {
-      setError(null)
-      recognition.current.start()
-      setIsListening(true)
+      // Start recording
+      try {
+        setError(null)
+        console.log("Checking permissions...")
+        
+        const hasPermission = await audioRecorderService.checkPermissions()
+        if (!hasPermission) {
+          setError("Microphone permission is required. Please allow microphone access.")
+          return
+        }
+        
+        console.log("Starting recording...")
+        await audioRecorderService.startRecording()
+        setIsRecording(true)
+        setIsListening(false) // We're recording, not processing
+      } catch (err) {
+        console.error("Failed to start recording:", err)
+        setError(err instanceof Error ? err.message : "Failed to start recording. Please check microphone permissions.")
+        setIsRecording(false)
+        setIsListening(false)
+      }
     }
   }
 
@@ -163,6 +203,53 @@ export function VoiceInterface() {
     }
   }
 
+  const handleTextToSpeech = async () => {
+    if (!transcript.trim()) {
+      setError("No text to convert to speech")
+      return
+    }
+
+    try {
+      setIsSpeaking(true)
+      setError(null)
+      console.log("Converting text to speech:", transcript)
+      await ttsService.textToSpeechSimple(transcript)
+      console.log("Text-to-speech completed successfully")
+      setIsSpeaking(false)
+    } catch (err) {
+      console.error("TTS Error:", err)
+      // Fallback to browser's native speech synthesis
+      console.log("Falling back to browser speech synthesis")
+      handleFallbackTTS()
+    }
+  }
+
+  const handleFallbackTTS = () => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(transcript)
+      utterance.rate = 0.9
+      utterance.pitch = 1
+      utterance.volume = 1
+      
+      utterance.onend = () => {
+        console.log("Fallback TTS completed")
+        setIsSpeaking(false)
+      }
+      
+      utterance.onerror = (event) => {
+        console.error("Fallback TTS error:", event)
+        setError("Failed to synthesize speech")
+        setIsSpeaking(false)
+      }
+      
+      console.log("Starting fallback speech synthesis")
+      speechSynthesis.speak(utterance)
+    } else {
+      setError("Speech synthesis not supported in this browser")
+      setIsSpeaking(false)
+    }
+  }
+
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
@@ -174,12 +261,12 @@ export function VoiceInterface() {
       <CardContent className="space-y-6">
         {/* Voice Visualization */}
         <div className="relative h-32 bg-muted/20 rounded-lg flex items-center justify-center overflow-hidden">
-          {isListening ? (
+          {isRecording ? (
             <div className="flex items-center gap-1">
               {[...Array(12)].map((_, i) => (
                 <div
                   key={i}
-                  className="w-1 bg-gradient-to-t from-primary to-blue-500 rounded-full animate-pulse"
+                  className="w-1 bg-gradient-to-t from-red-500 to-orange-500 rounded-full animate-pulse"
                   style={{
                     height: `${Math.random() * 60 + 20}px`,
                     animationDelay: `${i * 0.1}s`,
@@ -187,32 +274,63 @@ export function VoiceInterface() {
                 />
               ))}
             </div>
+          ) : isListening ? (
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="text-muted-foreground">Processing audio...</span>
+            </div>
           ) : (
-            <div className="text-muted-foreground">Click to start voice input</div>
+            <div className="text-muted-foreground">Click to start recording</div>
           )}
         </div>
 
         {/* Controls */}
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-4">
           <Button
             size="lg"
             onClick={toggleListening}
-            disabled={!recognition.current}
+            disabled={isListening}
             className={
-              isListening
-                ? "bg-destructive hover:bg-destructive/90"
+              isRecording
+                ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                : isListening 
+                ? "bg-yellow-500 hover:bg-yellow-600"
                 : "bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90"
             }
           >
-            {isListening ? (
+            {isRecording ? (
               <>
                 <MicOff className="w-5 h-5 mr-2" />
-                Stop Listening
+                Stop Recording
+              </>
+            ) : isListening ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Processing...
               </>
             ) : (
               <>
                 <Mic className="w-5 h-5 mr-2" />
-                Start Listening
+                Start Recording
+              </>
+            )}
+          </Button>
+
+          <Button
+            size="lg"
+            onClick={handleTextToSpeech}
+            disabled={!transcript.trim() || isSpeaking}
+            className="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600"
+          >
+            {isSpeaking ? (
+              <>
+                <VolumeX className="w-5 h-5 mr-2" />
+                Speaking...
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-5 h-5 mr-2" />
+                Speak Text
               </>
             )}
           </Button>
@@ -220,9 +338,25 @@ export function VoiceInterface() {
 
         {/* Transcript */}
         <div className="space-y-2">
-          <h4 className="text-sm font-medium">Live Transcript</h4>
-          <div className="min-h-[80px] p-3 bg-muted/20 rounded-lg text-sm">
-            {transcript || "Say something like: 'Schedule a marketing sync with Bob tomorrow at 2pm for 60 minutes'"}
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">Live Transcript</h4>
+            {transcript && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTranscript("")}
+                className="text-xs h-6"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          <div className="min-h-[80px] p-3 bg-muted/20 rounded-lg text-sm border border-border/50">
+            {transcript || (
+              <div className="text-muted-foreground italic">
+                Start recording to see your speech transcribed here...
+              </div>
+            )}
           </div>
         </div>
 
@@ -331,9 +465,23 @@ export function VoiceInterface() {
         )}
 
         {/* Status */}
-        <div className="flex items-center gap-2 text-sm">
-          <div className={`w-2 h-2 rounded-full ${isListening ? "bg-success animate-pulse" : "bg-muted-foreground"}`} />
-          <span className="text-muted-foreground">{isListening ? "Listening..." : "Ready to listen"}</span>
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${
+              isRecording ? "bg-red-500 animate-pulse" : 
+              isListening ? "bg-yellow-500 animate-pulse" : 
+              "bg-muted-foreground"
+            }`} />
+            <span className="text-muted-foreground">
+              {isRecording ? "Recording..." : 
+               isListening ? "Processing..." : 
+               "Ready to record"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${isSpeaking ? "bg-orange-500 animate-pulse" : "bg-muted-foreground"}`} />
+            <span className="text-muted-foreground">{isSpeaking ? "Speaking..." : "Ready to speak"}</span>
+          </div>
         </div>
       </CardContent>
     </Card>
