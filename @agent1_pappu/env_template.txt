@@ -1,0 +1,19 @@
+# Fetch.AI Agent Configuration
+# Copy this file to .env and replace with your actual values
+
+# Agent Seed Phrase - Replace with your own unique seed phrase
+AGENT_SEED="your_unique_seed_phrase_here"
+
+# Agent Identity
+AGENT_NAME="SchedulingAgent"
+AGENT_DESCRIPTION="AI agent for autonomous meeting scheduling and negotiation"
+
+# Database Configuration (for future integration)
+DATABASE_URL="postgresql://user:password@localhost:5432/agentschedule"
+
+# API Configuration
+API_BASE_URL="http://localhost:8000"
+
+# Agent Personality Settings
+DEFAULT_FLEXIBILITY_SCORE=5
+DEFAULT_PRIORITY_LEVEL=5
