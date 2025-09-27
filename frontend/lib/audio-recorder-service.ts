@@ -120,8 +120,17 @@ class AudioRecorderService {
   }
 
   async sendAudioToSTT(audioBlob: Blob): Promise<string> {
+    console.log("Sending audio to STT API:", {
+      size: audioBlob.size,
+      type: audioBlob.type
+    });
+
     const formData = new FormData();
-    formData.append('audio', audioBlob, 'recording.wav');
+    // Use appropriate file extension based on blob type
+    const fileName = audioBlob.type.includes('webm') ? 'recording.webm' : 
+                    audioBlob.type.includes('mp4') ? 'recording.mp4' : 'recording.wav';
+    
+    formData.append('audio', audioBlob, fileName);
 
     const response = await fetch('/api/stt', {
       method: 'POST',
@@ -130,10 +139,13 @@ class AudioRecorderService {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
+      console.error("STT API error:", errorData);
       throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
     }
 
     const result = await response.json();
+    console.log("STT API response:", result);
+    
     return result.transcript || "";
   }
 }

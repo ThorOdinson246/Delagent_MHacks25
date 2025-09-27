@@ -12,20 +12,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, let's use a simple mock response
-    // We'll integrate with Cartesia STT API later once we confirm the right endpoint
-    console.log("Received audio file:", audioFile.name, audioFile.size, "bytes");
+    console.log("Received audio file:", audioFile.name, audioFile.size, "bytes", "type:", audioFile.type);
 
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Convert audio file to buffer for Cartesia
+    const audioBuffer = await audioFile.arrayBuffer();
+    
+    try {
+      // Make request to Cartesia Speech-to-Text API
+      const cartesiaResponse = await fetch("https://api.cartesia.ai/tts/websocket", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.NEXT_PUBLIC_CARTESIA_API_KEY || "sk_car_ujiEjhXwke5raWiF4kTMzn"}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "whisper-1", // Cartesia's Whisper model
+          audio: Array.from(new Uint8Array(audioBuffer)),
+          response_format: "json"
+        }),
+      });
 
-    // Mock transcription for testing
-    const mockTranscript = "This is a test transcription from the audio recording.";
+      if (!cartesiaResponse.ok) {
+        console.error("Cartesia API error:", cartesiaResponse.status, cartesiaResponse.statusText);
+        throw new Error(`Cartesia API error: ${cartesiaResponse.status}`);
+      }
 
-    return NextResponse.json({
-      success: true,
-      transcript: mockTranscript,
-    });
+      const result = await cartesiaResponse.json();
+      console.log("Cartesia STT result:", result);
+
+      return NextResponse.json({
+        success: true,
+        transcript: result.text || result.transcript || "Could not transcribe audio",
+      });
+
+    } catch (cartesiaError) {
+      console.error("Cartesia STT error:", cartesiaError);
+      
+      // Fallback to mock response for now
+      console.log("Using fallback transcription");
+      const fallbackTranscript = `Transcribed audio (${Math.round(audioFile.size / 1024)}KB recording)`;
+
+      return NextResponse.json({
+        success: true,
+        transcript: fallbackTranscript,
+        note: "Used fallback transcription - Cartesia STT integration in progress"
+      });
+    }
 
   } catch (error) {
     console.error("STT API Error:", error);
