@@ -1,10 +1,22 @@
+"use client"
+
+import { useState } from "react"
 import { Header } from "@/components/header"
 import { VoiceInterface } from "@/components/voice-interface"
 import { MeetingDashboard } from "@/components/meeting-dashboard"
 import { NegotiationView } from "@/components/negotiation-view"
 import { AgentStatus } from "@/components/agent-status"
+import { FullPageVoiceInterface } from "@/components/full-page-voice-interface"
 
 export default function DashboardPage() {
+  const [showFullPageVoice, setShowFullPageVoice] = useState(true)
+
+  if (showFullPageVoice) {
+    return (
+      <FullPageVoiceInterface onMinimize={() => setShowFullPageVoice(false)} />
+    )
+  }
+
   return (
     <div className="min-h-screen grid-pattern">
       <Header />
@@ -21,7 +33,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
-          <VoiceInterface />
+          <VoiceInterface onExpand={() => setShowFullPageVoice(true)} />
           <AgentStatus />
         </div>
 

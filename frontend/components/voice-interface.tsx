@@ -5,20 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mic, MicOff, Volume2, Send, Calendar, VolumeX } from "lucide-react"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Mic, MicOff, Volume2, Send, Calendar, VolumeX, ChevronDown, Maximize2 } from "lucide-react"
 import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/api"
 import { ttsService } from "@/lib/tts-service"
 import { audioRecorderService } from "@/lib/audio-recorder-service"
-import { VoiceVisualizer } from "./voice-visualizer"
+import { EnhancedAudioVisualizer } from "./enhanced-audio-visualizer"
 
-declare global {
-  interface Window {
-    SpeechRecognition?: any
-    webkitSpeechRecognition?: any
-  }
-}
-
-export function VoiceInterface() {
+export function VoiceInterface({ onExpand }: { onExpand?: () => void }) {
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState("")
   const [meetingRequest, setMeetingRequest] = useState<MeetingRequest>({
@@ -32,18 +26,21 @@ export function VoiceInterface() {
   const [error, setError] = useState<string | null>(null)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [showMoreOptions, setShowMoreOptions] = useState(false)
+  const [audioLevels, setAudioLevels] = useState<number[]>([])
+  const [silenceCountdown, setSilenceCountdown] = useState<number | null>(null)
 
   const recognition = useRef<any | null>(null)
 
   useEffect(() => {
-    if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (typeof window !== "undefined" && ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition)) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
       recognition.current = new SpeechRecognition()
       recognition.current.continuous = true
       recognition.current.interimResults = true
       recognition.current.lang = "en-US"
 
-      recognition.current.onresult = (event) => {
+      recognition.current.onresult = (event: any) => {
         let finalTranscript = ""
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
@@ -56,7 +53,7 @@ export function VoiceInterface() {
         }
       }
 
-      recognition.current.onerror = (event) => {
+      recognition.current.onerror = (event: any) => {
         console.error("Speech recognition error:", event.error)
         setIsListening(false)
       }
@@ -111,33 +108,43 @@ export function VoiceInterface() {
     }
   }
 
+  const stopRecordingAndProcess = async () => {
+    try {
+      setIsListening(true) // Show processing state
+      setError(null)
+      console.log("Stopping recording...")
+      
+      const audioBlob = await audioRecorderService.stopRecording()
+      console.log("Audio recorded, sending for transcription...")
+      
+      const transcribedText = await audioRecorderService.sendAudioToSTT(audioBlob)
+      console.log("Transcription received:", transcribedText)
+      
+      if (transcribedText.trim()) {
+        setTranscript(transcribedText) // Replace instead of appending
+        parseVoiceCommand(transcribedText)
+      } else {
+        console.log("Empty transcription received")
+        setTranscript("") // Clear transcript if empty
+        setError("No speech detected. Please try speaking more clearly.")
+      }
+      
+      setIsRecording(false)
+      setIsListening(false)
+      setSilenceCountdown(null) // Clear countdown
+    } catch (err) {
+      console.error("Failed to process recording:", err)
+      setError(err instanceof Error ? err.message : "Failed to process recording")
+      setIsRecording(false)
+      setIsListening(false)
+      setSilenceCountdown(null) // Clear countdown
+    }
+  }
+
   const toggleListening = async () => {
     if (isRecording) {
-      // Stop recording and process audio
-      try {
-        setIsListening(true) // Show processing state
-        setError(null)
-        console.log("Stopping recording...")
-        
-        const audioBlob = await audioRecorderService.stopRecording()
-        console.log("Audio recorded, sending for transcription...")
-        
-        const transcribedText = await audioRecorderService.sendAudioToSTT(audioBlob)
-        console.log("Transcription received:", transcribedText)
-        
-        if (transcribedText.trim()) {
-          setTranscript(transcribedText) // Replace instead of appending
-          parseVoiceCommand(transcribedText)
-        }
-        
-        setIsRecording(false)
-        setIsListening(false)
-      } catch (err) {
-        console.error("Failed to process recording:", err)
-        setError(err instanceof Error ? err.message : "Failed to process recording")
-        setIsRecording(false)
-        setIsListening(false)
-      }
+      // Stop recording manually
+      await stopRecordingAndProcess()
     } else {
       // Start recording
       try {
@@ -151,6 +158,29 @@ export function VoiceInterface() {
         }
         
         console.log("Starting recording...")
+        
+        // Set up audio level callback for visualizer
+        audioRecorderService.setAudioLevelCallback((levels) => {
+          setAudioLevels(levels)
+        })
+        
+        // Set up silence countdown callback
+        audioRecorderService.setSilenceCountdownCallback((remainingTime) => {
+          setSilenceCountdown(remainingTime)
+        })
+        
+        // Set up auto-stop callback for voice activity detection
+        audioRecorderService.setAutoStopCallback(() => {
+          console.log("Auto-stopping recording due to silence")
+          setSilenceCountdown(null) // Clear countdown
+          stopRecordingAndProcess() // This will handle the stop and transcription
+        })
+        
+        // Enable VAD with 3-second timeout
+        audioRecorderService.enableVAD(true)
+        audioRecorderService.setSilenceTimeout(3000)
+        audioRecorderService.setSilenceThreshold(12) // Adjust based on testing
+        
         await audioRecorderService.startRecording()
         setIsRecording(true)
         setIsListening(false) // We're recording, not processing
@@ -254,16 +284,47 @@ export function VoiceInterface() {
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Volume2 className="w-5 h-5 text-primary" />
-          Voice Interface
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Volume2 className="w-5 h-5 text-primary" />
+            Voice Interface
+          </div>
+          {onExpand && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onExpand}
+              className="h-8 px-2"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Voice Visualization */}
-        <div className="relative h-40 bg-muted/20 rounded-lg flex items-center justify-center overflow-hidden">
-          <VoiceVisualizer isRecording={isRecording} isProcessing={isListening} />
+        <div className="relative h-64 bg-transparent rounded-lg flex items-center justify-center overflow-hidden">
+          <EnhancedAudioVisualizer 
+            isRecording={isRecording} 
+            isProcessing={isListening} 
+            audioLevels={audioLevels}
+            width={280}
+            height={280}
+            particleCount={120}
+          />
         </div>
+
+        {/* Silence Detection Indicator */}
+        {isRecording && silenceCountdown !== null && (
+          <div className="text-center mt-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-400/30 rounded-full text-yellow-800">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+              <span className="text-sm font-medium">
+                Auto-stopping in {Math.ceil(silenceCountdown / 1000)}s due to silence
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Controls */}
         <div className="flex justify-center gap-4">
@@ -317,84 +378,138 @@ export function VoiceInterface() {
           </Button>
         </div>
 
-        {/* Transcript */}
-        <div className="space-y-2">
+        {/* Enhanced Transcript */}
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">Live Transcript</h4>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full transition-colors ${
+                isRecording ? "bg-red-500 animate-pulse" : 
+                isListening ? "bg-yellow-500 animate-pulse" : 
+                transcript ? "bg-green-500" : "bg-gray-400"
+              }`} />
+              <h4 className="text-sm font-semibold text-black">
+                Live Transcript
+              </h4>
+            </div>
             {transcript && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 onClick={() => setTranscript("")}
-                className="text-xs h-6"
+                className="text-xs h-6 hover:bg-red-500/10 hover:text-red-500 transition-colors"
               >
                 Clear
               </Button>
             )}
           </div>
-          <div className="min-h-[80px] p-3 bg-muted/20 rounded-lg text-sm border border-border/50">
-            {transcript || (
-              <div className="text-muted-foreground italic">
-                Start recording to see your speech transcribed here...
+          <div className={`min-h-[100px] p-4 rounded-xl border-2 transition-all duration-300 ${
+            isRecording 
+              ? "bg-red-50/50 border-red-200/50 shadow-md shadow-red-100/50" 
+              : isListening
+              ? "bg-yellow-50/50 border-yellow-200/50 shadow-md shadow-yellow-100/50"
+              : transcript
+              ? "bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-lg shadow-primary/10"
+              : "bg-gray-50/30 border-gray-200/50"
+          }`}>
+            {transcript ? (
+              <div className="space-y-2">
+                <p className="text-xs leading-relaxed text-black font-normal">
+                  {transcript}
+                </p>
+                <div className="flex items-center gap-2 text-xs text-gray-700">
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  Transcription complete • {transcript.trim() ? transcript.trim().split(/\s+/).length : 0} words
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2">
+                  <div className="flex items-center justify-center w-12 h-12 mx-auto rounded-full bg-primary/10 mb-3">
+                    <svg className="w-6 h-6 text-primary/60" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-800 font-medium">
+                    {isRecording 
+                      ? "Recording in progress..." 
+                      : isListening 
+                      ? "Processing audio..." 
+                      : "Start recording to see your speech transcribed here"
+                    }
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    Your voice will be converted to text in real-time
+                  </p>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Meeting Request Form */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium">Meeting Request</h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={meetingRequest.title}
-                onChange={(e) => setMeetingRequest((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="Meeting title"
-              />
+        {/* Meeting Request Form - Collapsible */}
+        <Collapsible open={showMoreOptions} onOpenChange={setShowMoreOptions}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" className="w-full flex items-center justify-between">
+              <span className="text-sm font-medium">More Options</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showMoreOptions ? 'rotate-180' : ''}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-4 mt-4">
+            <h4 className="text-sm font-medium text-muted-foreground">Manual Meeting Request</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="title">Title</Label>
+                <Input
+                  id="title"
+                  value={meetingRequest.title}
+                  onChange={(e) => setMeetingRequest((prev) => ({ ...prev, title: e.target.value }))}
+                  placeholder="Meeting title"
+                />
+              </div>
+              <div>
+                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  value={meetingRequest.duration_minutes}
+                  onChange={(e) =>
+                    setMeetingRequest((prev) => ({ ...prev, duration_minutes: Number.parseInt(e.target.value) || 60 }))
+                  }
+                  placeholder="60"
+                />
+              </div>
+              <div>
+                <Label htmlFor="date">Preferred Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={meetingRequest.preferred_date}
+                  onChange={(e) => setMeetingRequest((prev) => ({ ...prev, preferred_date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="time">Preferred Time</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  value={meetingRequest.preferred_time}
+                  onChange={(e) => setMeetingRequest((prev) => ({ ...prev, preferred_time: e.target.value }))}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="duration">Duration (minutes)</Label>
-              <Input
-                id="duration"
-                type="number"
-                value={meetingRequest.duration_minutes}
-                onChange={(e) =>
-                  setMeetingRequest((prev) => ({ ...prev, duration_minutes: Number.parseInt(e.target.value) || 60 }))
-                }
-                placeholder="60"
-              />
-            </div>
-            <div>
-              <Label htmlFor="date">Preferred Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={meetingRequest.preferred_date}
-                onChange={(e) => setMeetingRequest((prev) => ({ ...prev, preferred_date: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="time">Preferred Time</Label>
-              <Input
-                id="time"
-                type="time"
-                value={meetingRequest.preferred_time}
-                onChange={(e) => setMeetingRequest((prev) => ({ ...prev, preferred_time: e.target.value }))}
-              />
-            </div>
-          </div>
 
-          <Button
-            onClick={handleNegotiateMeeting}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-primary to-blue-500"
-          >
-            <Calendar className="w-4 h-4 mr-2" />
-            {loading ? "Finding Available Slots..." : "Find Available Times"}
-          </Button>
-        </div>
+            <Button
+              onClick={handleNegotiateMeeting}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-primary to-blue-500"
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              {loading ? "Finding Available Slots..." : "Find Available Times"}
+            </Button>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Error Display */}
         {error && (
