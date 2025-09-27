@@ -8,6 +8,8 @@ import asyncio
 from datetime import datetime, timedelta
 import sys
 import os
+import random
+import uuid
 
 # Database configuration
 DATABASE_PATH = "/home/pappu/MHacks2025/agentschedule.db"
@@ -109,6 +111,133 @@ CREATE TABLE IF NOT EXISTS voice_sessions (
 );
 """
 
+def generate_alice_daily_schedule(date, day_offset):
+    """Generate realistic daily schedule for Alice (focused software engineer)"""
+    blocks = []
+    base_id = f"alice_{day_offset}_"
+    
+    # Alice's typical schedule patterns
+    morning_focus_start = random.choice([8, 9, 9, 9])  # Usually 9 AM
+    morning_focus_duration = random.choice([2, 3, 3, 4])  # 2-4 hours
+    
+    # Morning focus time (high priority, not moveable)
+    blocks.append((
+        f"{base_id}1", "alice", "Deep Work Session", 
+        date.replace(hour=morning_focus_start, minute=0, second=0, microsecond=0),
+        date.replace(hour=morning_focus_start + morning_focus_duration, minute=0, second=0, microsecond=0),
+        "focus_time", 9, False
+    ))
+    
+    # Lunch (fixed time)
+    lunch_start = random.choice([12, 12, 13])  # Usually 12-1 PM
+    blocks.append((
+        f"{base_id}2", "alice", "Lunch Break",
+        date.replace(hour=lunch_start, minute=0, second=0, microsecond=0),
+        date.replace(hour=lunch_start + 1, minute=0, second=0, microsecond=0),
+        "busy", 6, False
+    ))
+    
+    # Afternoon work (varies by day)
+    afternoon_start = lunch_start + 1
+    if random.random() < 0.3:  # 30% chance of afternoon focus time
+        blocks.append((
+            f"{base_id}3", "alice", "Afternoon Focus",
+            date.replace(hour=afternoon_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=afternoon_start + 2, minute=0, second=0, microsecond=0),
+            "focus_time", 8, False
+        ))
+        afternoon_start += 2
+    
+    # Team meetings (varies)
+    if random.random() < 0.4:  # 40% chance of team meeting
+        meeting_duration = random.choice([30, 45, 60])
+        meeting_end_hour = afternoon_start + (meeting_duration // 60)
+        meeting_end_minute = meeting_duration % 60
+        blocks.append((
+            f"{base_id}4", "alice", "Team Meeting",
+            date.replace(hour=afternoon_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=meeting_end_hour, minute=meeting_end_minute, second=0, microsecond=0),
+            "busy", 7, False
+        ))
+        afternoon_start += 1
+    
+    # Code review or client call
+    if random.random() < 0.3:  # 30% chance
+        blocks.append((
+            f"{base_id}5", "alice", "Code Review",
+            date.replace(hour=afternoon_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=afternoon_start + 1, minute=0, second=0, microsecond=0),
+            "busy", 6, False
+        ))
+    
+    return blocks
+
+def generate_bob_daily_schedule(date, day_offset):
+    """Generate realistic daily schedule for Bob (collaborative project manager)"""
+    blocks = []
+    base_id = f"bob_{day_offset}_"
+    
+    # Bob's typical schedule patterns (more meetings, more flexible)
+    morning_start = random.choice([8, 9, 9])  # Usually 9 AM
+    
+    # Morning planning/standup
+    if random.random() < 0.6:  # 60% chance of morning meeting
+        blocks.append((
+            f"{base_id}1", "bob", "Daily Standup",
+            date.replace(hour=morning_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=morning_start, minute=30, second=0, microsecond=0),
+            "busy", 7, False
+        ))
+        morning_start += 1
+    
+    # Flexible work time (moveable)
+    blocks.append((
+        f"{base_id}2", "bob", "Flexible Work Time",
+        date.replace(hour=morning_start, minute=0, second=0, microsecond=0),
+        date.replace(hour=morning_start + 2, minute=0, second=0, microsecond=0),
+        "flexible", 3, True
+    ))
+    
+    # Lunch
+    lunch_start = random.choice([12, 12, 13])
+    blocks.append((
+        f"{base_id}3", "bob", "Lunch",
+        date.replace(hour=lunch_start, minute=0, second=0, microsecond=0),
+        date.replace(hour=lunch_start + 1, minute=0, second=0, microsecond=0),
+        "busy", 5, False
+    ))
+    
+    # Afternoon meetings (Bob has more meetings)
+    afternoon_start = lunch_start + 1
+    meeting_count = random.randint(1, 3)  # 1-3 afternoon meetings
+    
+    for i in range(meeting_count):
+        meeting_types = ["Client Call", "Project Review", "Team Sync", "Stakeholder Meeting", "Planning Session"]
+        meeting_type = random.choice(meeting_types)
+        meeting_duration = random.choice([30, 45, 60, 90])
+        
+        meeting_end_hour = afternoon_start + (meeting_duration // 60)
+        meeting_end_minute = meeting_duration % 60
+        blocks.append((
+            f"{base_id}{4+i}", "bob", meeting_type,
+            date.replace(hour=afternoon_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=meeting_end_hour, minute=meeting_end_minute, second=0, microsecond=0),
+            "busy", random.randint(6, 8), False
+        ))
+        
+        afternoon_start += (meeting_duration // 60) + 1
+    
+    # End of day flexible time
+    if afternoon_start < 17:
+        blocks.append((
+            f"{base_id}{4+meeting_count}", "bob", "End of Day Tasks",
+            date.replace(hour=afternoon_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=17, minute=0, second=0, microsecond=0),
+            "flexible", 2, True
+        ))
+    
+    return blocks
+
 def setup_database():
     """Setup the SQLite database with schema and mock data"""
     print("🔧 Setting up SQLite database...")
@@ -142,98 +271,45 @@ def setup_database():
         
         print("✅ Users created")
         
-        # Create Alice's calendar (focused personality - lots of focus time)
-        now = datetime.now()
-        alice_calendar = [
-            # Today
-            ("alice_1", "alice", "Morning Focus Time", now.replace(hour=9, minute=0, second=0, microsecond=0), 
-             now.replace(hour=11, minute=0, second=0, microsecond=0), "focus_time", 9, False),
-            ("alice_2", "alice", "Lunch Break", now.replace(hour=12, minute=0, second=0, microsecond=0), 
-             now.replace(hour=13, minute=0, second=0, microsecond=0), "busy", 6, False),
-            ("alice_3", "alice", "Afternoon Focus Time", now.replace(hour=14, minute=0, second=0, microsecond=0), 
-             now.replace(hour=16, minute=0, second=0, microsecond=0), "focus_time", 8, False),
-            ("alice_4", "alice", "Team Standup", now.replace(hour=16, minute=30, second=0, microsecond=0), 
-             now.replace(hour=17, minute=0, second=0, microsecond=0), "busy", 7, False),
-            
-            # Tomorrow
-            ("alice_5", "alice", "Deep Work Session", (now + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0), 
-             (now + timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0), "focus_time", 9, False),
-            ("alice_6", "alice", "Client Call", (now + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0), 
-             (now + timedelta(days=1)).replace(hour=15, minute=0, second=0, microsecond=0), "busy", 8, False),
-            ("alice_7", "alice", "Flexible Time", (now + timedelta(days=1)).replace(hour=15, minute=30, second=0, microsecond=0), 
-             (now + timedelta(days=1)).replace(hour=17, minute=0, second=0, microsecond=0), "flexible", 4, True),
-            
-            # Day after tomorrow
-            ("alice_8", "alice", "Morning Focus", (now + timedelta(days=2)).replace(hour=9, minute=0, second=0, microsecond=0), 
-             (now + timedelta(days=2)).replace(hour=11, minute=0, second=0, microsecond=0), "focus_time", 9, False),
-            ("alice_9", "alice", "Project Review", (now + timedelta(days=2)).replace(hour=14, minute=0, second=0, microsecond=0), 
-             (now + timedelta(days=2)).replace(hour=15, minute=30, second=0, microsecond=0), "busy", 7, False),
-        ]
+        # Create realistic schedules for both users for the next month
+        now = datetime.now().replace(year=2025, month=9, day=27, hour=0, minute=0, second=0, microsecond=0)
+        alice_calendar = []
+        bob_calendar = []
         
+        # Generate realistic schedules for 30 days
+        for day in range(30):
+            current_date = now + timedelta(days=day)
+            day_of_week = current_date.weekday()  # 0=Monday, 6=Sunday
+            
+            # Skip weekends for work schedules
+            if day_of_week >= 5:  # Saturday or Sunday
+                continue
+                
+            # Alice's schedule (focused personality - software engineer)
+            alice_blocks = generate_alice_daily_schedule(current_date, day)
+            alice_calendar.extend(alice_blocks)
+            
+            # Bob's schedule (collaborative personality - project manager)
+            bob_blocks = generate_bob_daily_schedule(current_date, day)
+            bob_calendar.extend(bob_blocks)
+        
+        # Insert Alice's calendar blocks
         for block_id, user_id, title, start_time, end_time, block_type, priority, is_moveable in alice_calendar:
             cursor.execute("""
                 INSERT INTO calendar_blocks (id, user_id, title, start_time, end_time, block_type, priority, is_moveable)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (block_id, user_id, title, start_time, end_time, block_type, priority, is_moveable))
         
-        print("✅ Alice's calendar created (focused personality)")
+        print(f"✅ Alice's calendar created ({len(alice_calendar)} blocks) - focused personality")
         
-        # Create Bob's calendar (collaborative personality - more flexible)
-        bob_calendar = [
-            # Today
-            ("bob_1", "bob", "Team Meeting", now.replace(hour=10, minute=0, second=0, microsecond=0), 
-             now.replace(hour=11, minute=0, second=0, microsecond=0), "busy", 6, False),
-            ("bob_2", "bob", "Lunch", now.replace(hour=12, minute=0, second=0, microsecond=0), 
-             now.replace(hour=13, minute=0, second=0, microsecond=0), "busy", 5, False),
-            ("bob_3", "bob", "Flexible Work Time", now.replace(hour=13, minute=30, second=0, microsecond=0), 
-             now.replace(hour=15, minute=0, second=0, microsecond=0), "flexible", 3, True),
-            ("bob_4", "bob", "Client Presentation", now.replace(hour=15, minute=30, second=0, microsecond=0), 
-             now.replace(hour=16, minute=30, second=0, microsecond=0), "busy", 8, False),
-            
-            # Tomorrow
-            ("bob_5", "bob", "Flexible Morning", (now + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0), 
-             (now + timedelta(days=1)).replace(hour=11, minute=0, second=0, microsecond=0), "flexible", 2, True),
-            ("bob_6", "bob", "Project Sync", (now + timedelta(days=1)).replace(hour=11, minute=30, second=0, microsecond=0), 
-             (now + timedelta(days=1)).replace(hour=12, minute=30, second=0, microsecond=0), "busy", 6, False),
-            ("bob_7", "bob", "Open Time", (now + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0), 
-             (now + timedelta(days=1)).replace(hour=17, minute=0, second=0, microsecond=0), "available", 1, True),
-            
-            # Day after tomorrow
-            ("bob_8", "bob", "Weekly Planning", (now + timedelta(days=2)).replace(hour=9, minute=0, second=0, microsecond=0), 
-             (now + timedelta(days=2)).replace(hour=10, minute=0, second=0, microsecond=0), "busy", 7, False),
-            ("bob_9", "bob", "Flexible Afternoon", (now + timedelta(days=2)).replace(hour=10, minute=30, second=0, microsecond=0), 
-             (now + timedelta(days=2)).replace(hour=17, minute=0, second=0, microsecond=0), "flexible", 2, True),
-        ]
-        
+        # Insert Bob's calendar blocks
         for block_id, user_id, title, start_time, end_time, block_type, priority, is_moveable in bob_calendar:
             cursor.execute("""
                 INSERT INTO calendar_blocks (id, user_id, title, start_time, end_time, block_type, priority, is_moveable)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (block_id, user_id, title, start_time, end_time, block_type, priority, is_moveable))
         
-        print("✅ Bob's calendar created (collaborative personality)")
-        
-        # Create a test meeting request
-        meeting_id = "test-meeting-001"
-        cursor.execute("""
-            INSERT INTO meeting_requests (id, initiator_id, title, description, duration_minutes, 
-                                        preferred_start_time, preferred_end_time, priority_level)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (meeting_id, "bob", "Project Planning Meeting", "Weekly project planning and review", 90,
-        now + timedelta(hours=2), now + timedelta(hours=6), 6))
-        
-        # Add participants
-        cursor.execute("""
-            INSERT INTO meeting_participants (id, meeting_request_id, user_id, agent_address, is_required)
-            VALUES (?, ?, ?, ?, ?)
-        """, ("participant_1", meeting_id, "bob", "agent1qfy2twzrw6ne43eufnzadxj0s3xpzlwd7vrgde5yrq46043kp8hpzpx6x75", True))
-        
-        cursor.execute("""
-            INSERT INTO meeting_participants (id, meeting_request_id, user_id, agent_address, is_required)
-            VALUES (?, ?, ?, ?, ?)
-        """, ("participant_2", meeting_id, "alice", "agent1qfy2twzrw6ne43eufnzadxj0s3xpzlwd7vrgde5yrq46043kp8hpzpx6x76", True))
-        
-        print("✅ Test meeting request created")
+        print(f"✅ Bob's calendar created ({len(bob_calendar)} blocks) - collaborative personality")
         
         conn.commit()
         conn.close()

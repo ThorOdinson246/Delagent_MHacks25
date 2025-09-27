@@ -1,46 +1,37 @@
 #!/usr/bin/env python3
 """
-PERSISTENT Agent Negotiation - Real-world human-like negotiation
-- Updates database when meetings are scheduled
-- Explores multiple days
-- Continuous negotiation until success or real failure
-- Works like actual humans
-
-Time: 2025-09-30 09:00   Title: Project Planning
+Interactive Agent Negotiation System
+- User inputs meeting preferences
+- Agents negotiate to find best available slots
+- Provides multiple options for user selection
+- Minimal logging for clean interface
 """
 
 import asyncio
 import sys
 import os
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 import uuid
-import random
+import re
 
 # Add agent directories to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '@agent1_pappu'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '@agent2_alice'))
 
-from uagents.communication import send_message
-from models import MeetingRequest, MeetingParticipant, NegotiationMessage, MessageType, TimeProposal
-
 # Agent addresses
-BOB_AGENT_ADDRESS = "agent1qfy2twzrw6ne43eufnzadxj0s3xpzlwd7vrgde5yrq46043kp8hpzpx6x75"  # Bob's agent
+PAPPU_AGENT_ADDRESS = "agent1qfy2twzrw6ne43eufnzadxj0s3xpzlwd7vrgde5yrq46043kp8hpzpx6x75"  # Pappu's agent
 ALICE_AGENT_ADDRESS = "agent1qge95a5nqwjqgg0td05y9866jtjac7zf6g3908qjs330lm07kz8s799w9s8"  # Alice's agent
 
-class PersistentNegotiation:
-    """Real-world persistent negotiation system"""
+class InteractiveNegotiation:
+    """Interactive negotiation system with user input"""
     
     def __init__(self):
-        self.negotiation_log = []
-        self.meeting_request = None
-        self.max_rounds = 20  # Allow more negotiation rounds
-        self.current_round = 0
         self.db_manager = None
         self.calendar_service = None
         self.meeting_service = None
-        self.negotiation_id = str(uuid.uuid4())
-        self.scheduled_meeting = None
+        self.user_preferences = None
+        self.available_slots = []
     
     async def setup_database(self):
         """Setup database connection"""
@@ -55,282 +46,237 @@ class PersistentNegotiation:
             
             # Connect to database
             await self.db_manager.connect()
-            print("✅ Database connected successfully")
             return True
         except Exception as e:
             print(f"❌ Database setup failed: {e}")
             return False
     
-    def log_message(self, from_agent: str, to_agent: str, message_type: str, content: str):
-        """Log a message exchange"""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        log_entry = f"[{timestamp}] {from_agent} -> {to_agent}: {message_type} - {content}"
-        self.negotiation_log.append(log_entry)
-        print(f"📝 {log_entry}")
-    
-    async def create_meeting_request(self) -> MeetingRequest:
-        """Create a meeting request with dynamic timing and duration like real humans"""
-        now = datetime.now()
+    def get_user_input(self) -> Dict[str, Any]:
+        """Get meeting preferences from user"""
+        print("\n📅 Meeting Scheduler")
+        print("=" * 30)
+        print("Please provide your meeting preferences:")
+        print()
         
-        # Dynamic meeting types and durations (like real world)
-        meeting_types = [
-            ("Quick Sync", "Brief project update", 15),
-            ("Team Standup", "Daily team check-in", 30),
-            ("Project Planning", "Discuss project timeline and deliverables", 60),
-            ("Deep Dive", "Detailed technical discussion", 90),
-            ("Client Meeting", "Important client presentation", 45),
-            ("Brainstorming", "Creative ideation session", 75),
-            ("Review Meeting", "Project review and feedback", 30),
-            ("Strategy Session", "Long-term planning discussion", 120)
-        ]
+        # Get meeting title
+        title = input("Meeting title: ").strip()
+        if not title:
+            title = "Meeting with Alice"
         
-        # Randomly select meeting type
-        title, description, duration = random.choice(meeting_types)
+        # Get date input
+        print("\n📅 Date (format: YYYY-MM-DD, e.g., 2025-09-30)")
+        print("   Valid dates: 2025-09-27 to 2025-10-26 (weekdays only)")
+        while True:
+            date_str = input("Preferred date: ").strip()
+            try:
+                preferred_date = datetime.strptime(date_str, "%Y-%m-%d")
+                if preferred_date.weekday() >= 5:  # Weekend
+                    print("❌ Please select a weekday (Monday-Friday)")
+                    continue
+                if preferred_date < datetime(2025, 9, 27) or preferred_date > datetime(2025, 10, 26):
+                    print("❌ Date must be between 2025-09-27 and 2025-10-26")
+                    continue
+                break
+            except ValueError:
+                print("❌ Invalid date format. Use YYYY-MM-DD")
         
-        # Randomize the initial request time and day
-        hour_options = [9, 10, 11, 12, 13, 14, 15, 16, 17]
-        initial_hour = random.choice(hour_options)
-        day_offset = random.randint(0, 7)  # Check up to 7 days ahead
+        # Get time input
+        print("\n⏰ Time (format: HH:MM, e.g., 14:30)")
+        print("   Valid times: 08:00 to 17:00 (business hours)")
+        while True:
+            time_str = input("Preferred time: ").strip()
+            try:
+                preferred_time = datetime.strptime(time_str, "%H:%M")
+                if preferred_time.hour < 8 or preferred_time.hour >= 17:
+                    print("❌ Time must be between 08:00 and 17:00")
+                    continue
+                break
+            except ValueError:
+                print("❌ Invalid time format. Use HH:MM")
         
-        # Start from today's date and add random offset
-        base_date = now.replace(year=2025, month=9, day=27)  # Use database date as base
-        preferred_date = base_date + timedelta(days=day_offset)
+        # Get duration input
+        print("\n⏱️  Duration (in minutes)")
+        print("   Valid durations: 15, 30, 45, 60, 90, 120")
+        while True:
+            duration_str = input("Meeting duration: ").strip()
+            try:
+                duration = int(duration_str)
+                if duration not in [15, 30, 45, 60, 90, 120]:
+                    print("❌ Duration must be 15, 30, 45, 60, 90, or 120 minutes")
+                    continue
+                break
+            except ValueError:
+                print("❌ Please enter a valid number")
         
-        meeting_request = MeetingRequest(
-            id=str(uuid.uuid4()),
-            title=title,
-            description=description,
-            duration_minutes=duration,
-            participants=[
-                MeetingParticipant(
-                    user_id="bob",
-                    agent_address=BOB_AGENT_ADDRESS,
-                    name="Bob Smith",
-                    email="bob@example.com"
-                ),
-                MeetingParticipant(
-                    user_id="alice",
-                    agent_address=ALICE_AGENT_ADDRESS,
-                    name="Alice Johnson", 
-                    email="alice@example.com"
-                )
-            ],
-            # Dynamic timing based on meeting type
-            preferred_start_time=preferred_date.replace(hour=initial_hour, minute=0, second=0, microsecond=0),
-            preferred_end_time=preferred_date.replace(hour=initial_hour, minute=0, second=0, microsecond=0) + timedelta(minutes=duration),
-            priority_level=random.randint(4, 8),  # Dynamic priority
-            initiator_id="bob"
+        # Combine date and time
+        preferred_datetime = preferred_date.replace(
+            hour=preferred_time.hour, 
+            minute=preferred_time.minute, 
+            second=0, 
+            microsecond=0
         )
         
-        self.meeting_request = meeting_request
-        return meeting_request
+        return {
+            "title": title,
+            "preferred_datetime": preferred_datetime,
+            "duration_minutes": duration
+        }
     
-    async def send_meeting_request(self) -> bool:
-        """Send the initial meeting request from Bob to Alice"""
-        print("\n🤝 Starting PERSISTENT Agent Negotiation")
-        print("=" * 50)
+    async def find_available_slots(self, user_prefs: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Find available time slots for both users"""
+        print(f"\n🔍 Searching for available slots...")
         
-        # Create meeting request
-        meeting_request = await self.create_meeting_request()
+        preferred_time = user_prefs["preferred_datetime"]
+        duration = user_prefs["duration_minutes"]
         
-        print(f"📅 Meeting Request:")
-        print(f"   Title: {meeting_request.title}")
-        print(f"   Duration: {meeting_request.duration_minutes} minutes")
-        print(f"   Preferred Time: {meeting_request.preferred_start_time.strftime('%Y-%m-%d %H:%M')}")
-        print(f"   Initiator: Bob")
-        print(f"   Participants: Bob, Alice")
+        # Search window: 3 days before and after preferred date
+        search_start = preferred_time - timedelta(days=3)
+        search_end = preferred_time + timedelta(days=3)
         
-        # Send meeting request from Bob to Alice
-        print(f"\n📤 Bob sends meeting request to Alice...")
-        self.log_message("Bob", "Alice", "MEETING_REQUEST", f"Request for {meeting_request.title}")
+        available_slots = []
         
-        try:
-            await send_message(ALICE_AGENT_ADDRESS, meeting_request)
-            print("✅ Meeting request sent successfully")
-            return True
-        except Exception as e:
-            print(f"❌ Failed to send meeting request: {e}")
-            return False
-    
-    async def find_available_time(self, user_id: str, duration_minutes: int, start_date: datetime, end_date: datetime) -> Optional[datetime]:
-        """Find available time slots across multiple days with intelligent scheduling"""
-        print(f"   🔍 Searching for {duration_minutes}-minute slots from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-        
-        # Get user's existing schedule to understand patterns
-        user_blocks = await self.calendar_service.get_user_calendar_blocks(user_id)
-        print(f"   📅 Analyzing {len(user_blocks)} existing calendar blocks")
-        
-        current_date = start_date
-        best_slots = []
+        # Check each day in the search window
+        current_date = search_start.date()
+        end_date = search_end.date()
         
         while current_date <= end_date:
-            # Check each hour of the day with intelligent time slots
-            for hour in range(8, 18):  # 8 AM to 6 PM
-                for minute_offset in [0, 15, 30, 45]:  # Check quarter-hour slots
-                    test_start = current_date.replace(hour=hour, minute=minute_offset, second=0, microsecond=0)
-                    test_end = test_start + timedelta(minutes=duration_minutes)
+            # Skip weekends
+            if current_date.weekday() >= 5:
+                current_date += timedelta(days=1)
+                continue
+            
+            # Check each hour from 8 AM to 5 PM
+            for hour in range(8, 17):
+                for minute in [0, 15, 30, 45]:
+                    test_start = datetime.combine(current_date, datetime.min.time().replace(hour=hour, minute=minute))
+                    test_end = test_start + timedelta(minutes=duration)
                     
-                    # Skip if it goes past 6 PM
-                    if test_end.hour >= 18:
+                    # Skip if it goes past 5 PM
+                    if test_end.hour >= 17:
                         continue
                     
-                    # Check for conflicts
-                    conflicts = await self.calendar_service.check_time_conflict(user_id, test_start, test_end)
+                    # Check availability for both users
+                    pappu_conflicts = await self.calendar_service.check_time_conflict("bob", test_start, test_end)
+                    alice_conflicts = await self.calendar_service.check_time_conflict("alice", test_start, test_end)
                     
-                    if not conflicts:
-                        # Calculate slot quality score (prefer certain times)
-                        quality_score = self.calculate_slot_quality(test_start, user_id)
-                        best_slots.append((test_start, quality_score))
-                        print(f"   ✅ Found slot: {test_start.strftime('%Y-%m-%d %H:%M')} - {test_end.strftime('%H:%M')} (Quality: {quality_score})")
+                    if not pappu_conflicts and not alice_conflicts:
+                        # Calculate quality score
+                        quality_score = self.calculate_slot_quality(test_start, preferred_time)
+                        available_slots.append({
+                            "start_time": test_start,
+                            "end_time": test_end,
+                            "quality_score": quality_score,
+                            "duration_minutes": duration
+                        })
             
-            # Move to next day
             current_date += timedelta(days=1)
         
-        if best_slots:
-            # Sort by quality score and return the best option
-            best_slots.sort(key=lambda x: x[1], reverse=True)
-            best_time = best_slots[0][0]
-            print(f"   🎯 Selected best slot: {best_time.strftime('%Y-%m-%d %H:%M')}")
-            return best_time
+        # Sort by quality score (higher is better)
+        available_slots.sort(key=lambda x: x["quality_score"], reverse=True)
         
-        print(f"   ❌ No available slots found in the date range")
-        return None
+        return available_slots[:5]  # Return top 5 options
     
-    def calculate_slot_quality(self, time_slot: datetime, user_id: str) -> int:
-        """Calculate quality score for a time slot (like real humans prefer certain times)"""
+    def calculate_slot_quality(self, slot_time: datetime, preferred_time: datetime) -> int:
+        """Calculate quality score for a time slot"""
         score = 0
         
-        # Prefer morning slots (9-11 AM)
-        if 9 <= time_slot.hour <= 11:
+        # Prefer slots closer to preferred time
+        time_diff = abs((slot_time - preferred_time).total_seconds() / 3600)  # hours
+        if time_diff == 0:
+            score += 100  # Exact match
+        elif time_diff <= 1:
+            score += 80   # Within 1 hour
+        elif time_diff <= 2:
+            score += 60   # Within 2 hours
+        elif time_diff <= 4:
+            score += 40   # Within 4 hours
+        else:
+            score += 20   # Further away
+        
+        # Prefer certain times of day
+        if 9 <= slot_time.hour <= 11:  # Morning
             score += 10
-        
-        # Prefer afternoon slots (2-4 PM)
-        elif 14 <= time_slot.hour <= 16:
+        elif 14 <= slot_time.hour <= 16:  # Afternoon
             score += 8
-        
-        # Prefer early morning over late afternoon
-        elif 8 <= time_slot.hour <= 9:
+        elif 8 <= slot_time.hour <= 9:  # Early morning
             score += 6
-        elif 16 <= time_slot.hour <= 17:
+        elif 16 <= slot_time.hour <= 17:  # Late afternoon
             score += 4
         
-        # Prefer round hours (9:00, 10:00, etc.)
-        if time_slot.minute == 0:
+        # Prefer round times
+        if slot_time.minute == 0:
             score += 5
-        elif time_slot.minute == 30:
+        elif slot_time.minute == 30:
             score += 3
-        
-        # Prefer weekdays over weekends (if applicable)
-        if time_slot.weekday() < 5:  # Monday-Friday
-            score += 2
         
         return score
     
-    async def alice_negotiates(self, proposed_time: datetime) -> Dict[str, Any]:
-        """Alice's negotiation logic"""
-        print(f"\n🧠 Alice analyzes proposal: {proposed_time.strftime('%Y-%m-%d %H:%M')}")
+    def display_available_slots(self, slots: List[Dict[str, Any]]) -> None:
+        """Display available time slots to user"""
+        if not slots:
+            print("\n❌ No available time slots found in the search window")
+            return
         
-        # Check for conflicts
-        proposed_end = proposed_time + timedelta(minutes=self.meeting_request.duration_minutes)
-        conflicts = await self.calendar_service.check_time_conflict("alice", proposed_time, proposed_end)
+        print(f"\n✅ Found {len(slots)} available time slots:")
+        print("-" * 50)
         
-        if conflicts:
-            print(f"   ❌ Alice has conflicts:")
-            for conflict in conflicts:
-                print(f"      - {conflict['title']}: {conflict['start_time']} to {conflict['end_time']} (Priority: {conflict['priority']})")
+        for i, slot in enumerate(slots, 1):
+            start_time = slot["start_time"]
+            end_time = slot["end_time"]
+            quality = slot["quality_score"]
             
-            # Find alternative time (search next 7 days like real humans)
-            search_start = proposed_time
-            search_end = search_start + timedelta(days=7)
-            
-            alternative_time = await self.find_available_time("alice", self.meeting_request.duration_minutes, search_start, search_end)
-            
-            if alternative_time:
-                return {
-                    "action": "counter_proposal",
-                    "time": alternative_time,
-                    "reasoning": f"I have conflicts at {proposed_time.strftime('%H:%M')}. How about {alternative_time.strftime('%Y-%m-%d %H:%M')}?"
-                }
-            else:
-                return {
-                    "action": "reject",
-                    "reasoning": "I don't have any available time slots in the next few days"
-                }
-        else:
-            return {
-                "action": "accept",
-                "time": proposed_time,
-                "reasoning": f"{proposed_time.strftime('%H:%M')} works perfectly for me!"
-            }
+            print(f"{i}. {start_time.strftime('%A, %Y-%m-%d at %H:%M')} - {end_time.strftime('%H:%M')}")
+            print(f"   Duration: {slot['duration_minutes']} minutes | Quality Score: {quality}")
+            print()
     
-    async def bob_negotiates(self, proposed_time: datetime) -> Dict[str, Any]:
-        """Bob's negotiation logic"""
-        print(f"\n🧠 Bob analyzes proposal: {proposed_time.strftime('%Y-%m-%d %H:%M')}")
+    def get_user_selection(self, slots: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Get user's selection from available slots"""
+        if not slots:
+            return None
         
-        # Check for conflicts
-        proposed_end = proposed_time + timedelta(minutes=self.meeting_request.duration_minutes)
-        conflicts = await self.calendar_service.check_time_conflict("bob", proposed_time, proposed_end)
-        
-        if conflicts:
-            print(f"   ❌ Bob has conflicts:")
-            for conflict in conflicts:
-                print(f"      - {conflict['title']}: {conflict['start_time']} to {conflict['end_time']} (Priority: {conflict['priority']})")
-            
-            # Find alternative time (search next 7 days like real humans)
-            search_start = proposed_time
-            search_end = search_start + timedelta(days=7)
-            
-            alternative_time = await self.find_available_time("bob", self.meeting_request.duration_minutes, search_start, search_end)
-            
-            if alternative_time:
-                return {
-                    "action": "counter_proposal",
-                    "time": alternative_time,
-                    "reasoning": f"I have conflicts at {proposed_time.strftime('%H:%M')}. How about {alternative_time.strftime('%Y-%m-%d %H:%M')}?"
-                }
-            else:
-                return {
-                    "action": "reject",
-                    "reasoning": "I don't have any available time slots in the next few days"
-                }
-        else:
-            return {
-                "action": "accept",
-                "time": proposed_time,
-                "reasoning": f"{proposed_time.strftime('%H:%M')} works perfectly for me!"
-            }
+        while True:
+            try:
+                choice = input(f"Select a slot (1-{len(slots)}) or 'q' to quit: ").strip().lower()
+                if choice == 'q':
+                    return None
+                
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(slots):
+                    return slots[choice_num - 1]
+                else:
+                    print(f"❌ Please enter a number between 1 and {len(slots)}")
+            except ValueError:
+                print("❌ Please enter a valid number or 'q' to quit")
     
-    async def schedule_meeting(self, meeting_time: datetime) -> bool:
-        """Actually schedule the meeting in the database"""
-        print(f"\n📅 Scheduling meeting for {meeting_time.strftime('%Y-%m-%d %H:%M')}")
+    async def schedule_meeting(self, slot: Dict[str, Any], user_prefs: Dict[str, Any]) -> bool:
+        """Schedule the selected meeting"""
+        print(f"\n📅 Scheduling meeting...")
         
         try:
-            # Create meeting request in database
+            # Create meeting request
             meeting_id = await self.meeting_service.create_meeting_request(
-                initiator_id="bob",
-                title=self.meeting_request.title,
-                description=self.meeting_request.description,
-                duration_minutes=self.meeting_request.duration_minutes,
-                preferred_start_time=meeting_time,
-                preferred_end_time=meeting_time + timedelta(minutes=self.meeting_request.duration_minutes),
-                priority_level=self.meeting_request.priority_level
+                initiator_id="bob",  # Pappu is represented as "bob" in the database
+                title=user_prefs["title"],
+                description=f"Meeting scheduled by user",
+                duration_minutes=slot["duration_minutes"],
+                preferred_start_time=slot["start_time"],
+                preferred_end_time=slot["end_time"],
+                priority_level=7
             )
             
             # Add participants
-            await self.meeting_service.add_meeting_participant(meeting_id, "bob", BOB_AGENT_ADDRESS)
+            await self.meeting_service.add_meeting_participant(meeting_id, "bob", PAPPU_AGENT_ADDRESS)
             await self.meeting_service.add_meeting_participant(meeting_id, "alice", ALICE_AGENT_ADDRESS)
             
             # Update status to scheduled
-            await self.meeting_service.update_meeting_status(meeting_id, "scheduled", meeting_time)
+            await self.meeting_service.update_meeting_status(meeting_id, "scheduled", slot["start_time"])
             
             # Add calendar blocks for both participants
-            meeting_end = meeting_time + timedelta(minutes=self.meeting_request.duration_minutes)
-            
             await self.calendar_service.add_calendar_block(
                 "bob", 
-                f"Meeting: {self.meeting_request.title}", 
-                meeting_time, 
-                meeting_end, 
+                f"Meeting: {user_prefs['title']}", 
+                slot["start_time"], 
+                slot["end_time"], 
                 "busy", 
                 8, 
                 False
@@ -338,25 +284,18 @@ class PersistentNegotiation:
             
             await self.calendar_service.add_calendar_block(
                 "alice", 
-                f"Meeting: {self.meeting_request.title}", 
-                meeting_time, 
-                meeting_end, 
+                f"Meeting: {user_prefs['title']}", 
+                slot["start_time"], 
+                slot["end_time"], 
                 "busy", 
                 8, 
                 False
             )
             
-            self.scheduled_meeting = {
-                "id": meeting_id,
-                "time": meeting_time,
-                "title": self.meeting_request.title
-            }
-            
             print(f"✅ Meeting scheduled successfully!")
             print(f"   Meeting ID: {meeting_id}")
-            print(f"   Time: {meeting_time.strftime('%Y-%m-%d %H:%M')}")
-            print(f"   Duration: {self.meeting_request.duration_minutes} minutes")
-            print(f"   Calendar blocks added for both participants")
+            print(f"   Time: {slot['start_time'].strftime('%A, %Y-%m-%d at %H:%M')}")
+            print(f"   Duration: {slot['duration_minutes']} minutes")
             
             return True
             
@@ -364,143 +303,50 @@ class PersistentNegotiation:
             print(f"❌ Failed to schedule meeting: {e}")
             return False
     
-    async def run_persistent_negotiation(self) -> bool:
-        """Run continuous negotiation until success or real failure"""
-        print("🚀 Starting PERSISTENT Agent Negotiation")
-        print("=" * 50)
+    async def run(self) -> bool:
+        """Run the interactive negotiation system"""
+        print("🤖 Interactive Agent Negotiation System")
+        print("=" * 40)
         
         # Setup database
         if not await self.setup_database():
             return False
         
-        # Send initial meeting request
-        if not await self.send_meeting_request():
+        # Get user preferences
+        self.user_preferences = self.get_user_input()
+        
+        # Find available slots
+        self.available_slots = await self.find_available_slots(self.user_preferences)
+        
+        # Display options
+        self.display_available_slots(self.available_slots)
+        
+        # Get user selection
+        selected_slot = self.get_user_selection(self.available_slots)
+        
+        if selected_slot:
+            # Schedule the meeting
+            return await self.schedule_meeting(selected_slot, self.user_preferences)
+        else:
+            print("\n👋 Meeting scheduling cancelled")
             return False
-        
-        # Wait a bit for the message to be processed
-        await asyncio.sleep(2)
-        
-        # Start negotiation
-        current_proposal = self.meeting_request.preferred_start_time
-        current_negotiator = "alice"  # Alice responds first
-        
-        for round_num in range(1, self.max_rounds + 1):
-            print(f"\n🔄 Negotiation Round {round_num}")
-            print("-" * 30)
-            
-            if current_negotiator == "alice":
-                # Alice's turn to respond
-                alice_response = await self.alice_negotiates(current_proposal)
-                
-                if alice_response["action"] == "accept":
-                    self.log_message("Alice", "Bob", "ACCEPTANCE", alice_response["reasoning"])
-                    
-                    # Schedule the meeting
-                    if await self.schedule_meeting(current_proposal):
-                        print(f"\n🎉 NEGOTIATION SUCCESSFUL!")
-                        print(f"   Meeting scheduled for {current_proposal.strftime('%Y-%m-%d %H:%M')}")
-                        print(f"   Duration: {self.meeting_request.duration_minutes} minutes")
-                        print(f"   Database updated with new meeting")
-                        return True
-                    else:
-                        print(f"❌ Failed to schedule meeting")
-                        return False
-                
-                elif alice_response["action"] == "counter_proposal":
-                    self.log_message("Alice", "Bob", "COUNTER_PROPOSAL", alice_response["reasoning"])
-                    current_proposal = alice_response["time"]
-                    current_negotiator = "bob"
-                
-                elif alice_response["action"] == "reject":
-                    self.log_message("Alice", "Bob", "REJECTION", alice_response["reasoning"])
-                    print(f"\n❌ Negotiation failed: Alice rejected")
-                    return False
-            
-            else:
-                # Bob's turn to respond
-                bob_response = await self.bob_negotiates(current_proposal)
-                
-                if bob_response["action"] == "accept":
-                    self.log_message("Bob", "Alice", "ACCEPTANCE", bob_response["reasoning"])
-                    
-                    # Schedule the meeting
-                    if await self.schedule_meeting(current_proposal):
-                        print(f"\n🎉 NEGOTIATION SUCCESSFUL!")
-                        print(f"   Meeting scheduled for {current_proposal.strftime('%Y-%m-%d %H:%M')}")
-                        print(f"   Duration: {self.meeting_request.duration_minutes} minutes")
-                        print(f"   Database updated with new meeting")
-                        return True
-                    else:
-                        print(f"❌ Failed to schedule meeting")
-                        return False
-                
-                elif bob_response["action"] == "counter_proposal":
-                    self.log_message("Bob", "Alice", "COUNTER_PROPOSAL", bob_response["reasoning"])
-                    current_proposal = bob_response["time"]
-                    current_negotiator = "alice"
-                
-                elif bob_response["action"] == "reject":
-                    self.log_message("Bob", "Alice", "REJECTION", bob_response["reasoning"])
-                    print(f"\n❌ Negotiation failed: Bob rejected")
-                    return False
-        
-        print(f"\n❌ Negotiation failed: Maximum rounds ({self.max_rounds}) reached")
-        return False
-    
-    def print_negotiation_summary(self):
-        """Print the negotiation summary"""
-        print(f"\n📊 PERSISTENT Negotiation Summary:")
-        print("=" * 40)
-        for log_entry in self.negotiation_log:
-            print(f"   {log_entry}")
-        
-        if self.scheduled_meeting:
-            print(f"\n🎯 Meeting Scheduled:")
-            print(f"   ID: {self.scheduled_meeting['id']}")
-            print(f"   Time: {self.scheduled_meeting['time'].strftime('%Y-%m-%d %H:%M')}")
-            print(f"   Title: {self.scheduled_meeting['title']}")
-        
-        print(f"\n🎯 Key Features:")
-        print("   ✅ Database persistence - meetings are actually scheduled")
-        print("   ✅ Multi-day exploration - checks multiple days")
-        print("   ✅ Continuous negotiation - keeps trying until success")
-        print("   ✅ Real-world logic - works like humans")
-        print("   ✅ Calendar updates - blocks time for both participants")
 
 async def main():
-    """Main test function"""
-    print("🧪 DYNAMIC Agent Negotiation - Real-World Human Logic")
-    print("=" * 60)
-    print("This system will:")
-    print("  1. Send a meeting request with DYNAMIC duration (15-120 mins)")
-    print("  2. Negotiate continuously until success or real failure")
-    print("  3. Explore multiple days (up to 7 days ahead)")
-    print("  4. Use intelligent time slot selection")
-    print("  5. Actually schedule meetings in the database")
-    print("  6. Block calendar time for both participants")
-    print("  7. Remember scheduled meetings for future runs")
-    print("  8. Different results every time (like real humans)")
-    print()
-    
-    # Run the persistent negotiation
-    negotiation = PersistentNegotiation()
-    success = await negotiation.run_persistent_negotiation()
+    """Main function"""
+    negotiation = InteractiveNegotiation()
+    success = await negotiation.run()
     
     if success:
-        negotiation.print_negotiation_summary()
-        print("\n🎉 PERSISTENT negotiation completed successfully!")
-        print("   Meeting is now scheduled in the database")
-        print("   Next run will see this meeting as a conflict")
+        print("\n🎉 Meeting scheduled successfully!")
     else:
-        print("\n❌ Persistent negotiation failed")
-        print("   No meeting was scheduled")
+        print("\n❌ No meeting was scheduled")
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n⏹️  Test interrupted by user")
+        print("\n⏹️  Interrupted by user")
     except Exception as e:
-        print(f"\n❌ Test error: {e}")
+        print(f"\n❌ Error: {e}")
         import traceback
         traceback.print_exc()
