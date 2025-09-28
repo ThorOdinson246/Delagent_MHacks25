@@ -1,12 +1,22 @@
+"use client"
+
+import { useState } from "react"
 import { Header } from "@/components/header"
 import { VoiceInterface } from "@/components/voice-interface"
 import { MeetingDashboard } from "@/components/meeting-dashboard"
 import { NegotiationView } from "@/components/negotiation-view"
 import { AgentStatus } from "@/components/agent-status"
+import { FullPageVoiceInterface } from "@/components/full-page-voice-interface"
 
 export default function DashboardPage() {
+  const [showFullPageVoice, setShowFullPageVoice] = useState(true)
+
+  if (showFullPageVoice) {
+    return <FullPageVoiceInterface onClose={() => setShowFullPageVoice(false)} />
+  }
+
   return (
-    <div className="min-h-screen grid-pattern">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-blue-50">
       <Header />
       <main className="container mx-auto px-4 py-8 space-y-8">
         <div className="flex items-center justify-between">

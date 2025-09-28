@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mic, MicOff, Volume2, Send, Calendar, VolumeX } from "lucide-react"
+import { Mic, MicOff, Send, Calendar } from "lucide-react"
 import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/api"
-import { ttsService } from "@/lib/tts-service"
+
 import { audioRecorderService } from "@/lib/audio-recorder-service"
 import { voiceService } from "@/lib/voice-service"
-import { VoiceVisualizer } from "./voice-visualizer"
+import { EnhancedAudioVisualizer } from "./enhanced-audio-visualizer"
 
 // Speech Recognition types are handled by the DOM lib
 
@@ -26,8 +26,9 @@ export function VoiceInterface() {
   const [negotiationResult, setNegotiationResult] = useState<NegotiationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isSpeaking, setIsSpeaking] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [silenceCountdown, setSilenceCountdown] = useState(0)
+  const [audioLevels, setAudioLevels] = useState<number[]>([])
 
   const recognition = useRef<any | null>(null)
 
@@ -85,17 +86,9 @@ export function VoiceInterface() {
         setNegotiationResult(result.context.negotiationResult)
       }
       
-      // Speak the AI-generated response
+      // Log the AI-generated response (TTS functionality removed)
       if (result.spokenResponse) {
-        console.log("Speaking AI response:", result.spokenResponse)
-        setIsSpeaking(true)
-        try {
-          await ttsService.textToSpeechSimple(result.spokenResponse)
-        } catch (ttsError) {
-          console.error("TTS failed, using browser fallback:", ttsError)
-          handleFallbackTTS(result.spokenResponse)
-        }
-        setIsSpeaking(false)
+        console.log("AI response:", result.spokenResponse)
       }
       
     } catch (err) {
@@ -144,37 +137,48 @@ export function VoiceInterface() {
     }
   }
 
+  // Separate function to stop recording and process to avoid infinite loops
+  const stopRecordingAndProcess = async () => {
+    if (!isRecording) return
+    
+    try {
+      setIsListening(true) // Show processing state
+      setError(null)
+      console.log("Stopping recording...")
+      
+      const audioBlob = await audioRecorderService.stopRecording()
+      console.log("Audio recorded, sending for transcription...")
+      
+      const transcribedText = await audioRecorderService.sendAudioToSTT(audioBlob)
+      console.log("Transcription received:", transcribedText)
+      
+      if (transcribedText.trim()) {
+        setTranscript(transcribedText)
+        await handleVoiceOrchestration(transcribedText)
+      } else {
+        setError("No speech detected. Please try speaking louder or closer to the microphone.")
+      }
+      
+      setIsRecording(false)
+      setIsListening(false)
+      setSilenceCountdown(0)
+    } catch (err) {
+      console.error("Failed to process recording:", err)
+      setError(err instanceof Error ? err.message : "Failed to process recording")
+      setIsRecording(false)
+      setIsListening(false)
+      setSilenceCountdown(0)
+    }
+  }
+
   const toggleListening = async () => {
     if (isRecording) {
-      // Stop recording and process audio
-      try {
-        setIsListening(true) // Show processing state
-        setError(null)
-        console.log("Stopping recording...")
-        
-        const audioBlob = await audioRecorderService.stopRecording()
-        console.log("Audio recorded, sending for transcription...")
-        
-        const transcribedText = await audioRecorderService.sendAudioToSTT(audioBlob)
-        console.log("Transcription received:", transcribedText)
-        
-        if (transcribedText.trim()) {
-          setTranscript(transcribedText)
-          await handleVoiceOrchestration(transcribedText)
-        }
-        
-        setIsRecording(false)
-        setIsListening(false)
-      } catch (err) {
-        console.error("Failed to process recording:", err)
-        setError(err instanceof Error ? err.message : "Failed to process recording")
-        setIsRecording(false)
-        setIsListening(false)
-      }
+      await stopRecordingAndProcess()
     } else {
       // Start recording
       try {
         setError(null)
+        setSilenceCountdown(0)
         console.log("Checking permissions...")
         
         const hasPermission = await audioRecorderService.checkPermissions()
@@ -182,6 +186,11 @@ export function VoiceInterface() {
           setError("Microphone permission is required. Please allow microphone access.")
           return
         }
+        
+        // Set up callbacks for auto-stop and audio levels
+        audioRecorderService.setAutoStopCallback(stopRecordingAndProcess)
+        audioRecorderService.setCountdownCallback(setSilenceCountdown)
+        audioRecorderService.setAudioLevelCallback(setAudioLevels)
         
         console.log("Starting recording...")
         await audioRecorderService.startRecording()
@@ -192,6 +201,7 @@ export function VoiceInterface() {
         setError(err instanceof Error ? err.message : "Failed to start recording. Please check microphone permissions.")
         setIsRecording(false)
         setIsListening(false)
+        setSilenceCountdown(0)
       }
     }
   }
@@ -237,66 +247,32 @@ export function VoiceInterface() {
     }
   }
 
-  const handleTextToSpeech = async () => {
-    if (!transcript.trim()) {
-      setError("No text to convert to speech")
-      return
-    }
 
-    try {
-      setIsSpeaking(true)
-      setError(null)
-      console.log("Converting text to speech:", transcript)
-      await ttsService.textToSpeechSimple(transcript)
-      console.log("Text-to-speech completed successfully")
-      setIsSpeaking(false)
-    } catch (err) {
-      console.error("TTS Error:", err)
-      // Fallback to browser's native speech synthesis
-      console.log("Falling back to browser speech synthesis")
-      handleFallbackTTS()
-    }
-  }
-
-  const handleFallbackTTS = (text?: string) => {
-    const textToSpeak = text || transcript
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(textToSpeak)
-      utterance.rate = 0.9
-      utterance.pitch = 1
-      utterance.volume = 1
-      
-      utterance.onend = () => {
-        console.log("Fallback TTS completed")
-        setIsSpeaking(false)
-      }
-      
-      utterance.onerror = (event) => {
-        console.error("Fallback TTS error:", event)
-        setError("Failed to synthesize speech")
-        setIsSpeaking(false)
-      }
-      
-      console.log("Starting fallback speech synthesis")
-      speechSynthesis.speak(utterance)
-    } else {
-      setError("Speech synthesis not supported in this browser")
-      setIsSpeaking(false)
-    }
-  }
 
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Volume2 className="w-5 h-5 text-primary" />
+          <Mic className="w-5 h-5 text-primary" />
           Voice Interface
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Voice Visualization */}
-        <div className="relative h-40 bg-muted/20 rounded-lg flex items-center justify-center overflow-hidden">
-          <VoiceVisualizer isRecording={isRecording} isProcessing={isListening} />
+        <div className="relative h-64 rounded-lg flex items-center justify-center overflow-hidden">
+          <EnhancedAudioVisualizer 
+            isRecording={isRecording} 
+            isProcessing={isListening} 
+            audioLevels={audioLevels}
+            width={280}
+            height={280}
+            particleCount={120}
+          />
+          {silenceCountdown > 0 && (
+            <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm border border-gray-300 text-gray-800 px-3 py-1 rounded-full text-sm font-medium shadow-lg">
+              Auto-stop in {silenceCountdown}s
+            </div>
+          )}
         </div>
 
         {/* Controls */}
@@ -331,30 +307,18 @@ export function VoiceInterface() {
             )}
           </Button>
 
-          <Button
-            size="lg"
-            onClick={handleTextToSpeech}
-            disabled={!transcript.trim() || isSpeaking}
-            className="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600"
-          >
-            {isSpeaking ? (
-              <>
-                <VolumeX className="w-5 h-5 mr-2" />
-                Speaking...
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-5 h-5 mr-2" />
-                Speak Text
-              </>
-            )}
-          </Button>
+
         </div>
 
         {/* Transcript */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">Live Transcript</h4>
+            <h4 className="text-sm font-medium">
+              Live Transcript 
+              <span className="text-xs text-muted-foreground ml-2">
+                ({transcript.trim() ? transcript.trim().split(/\s+/).length : 0} words)
+              </span>
+            </h4>
             {transcript && (
               <Button
                 size="sm"
@@ -432,7 +396,7 @@ export function VoiceInterface() {
 
         {/* Error Display */}
         {error && (
-          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+          <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-sm">
             {error}
           </div>
         )}
@@ -480,7 +444,7 @@ export function VoiceInterface() {
         )}
 
         {/* Status */}
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-center text-sm">
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${
               isRecording ? "bg-red-500 animate-pulse" : 
@@ -492,10 +456,11 @@ export function VoiceInterface() {
                isListening ? "Processing..." : 
                "Ready to record"}
             </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${isSpeaking ? "bg-orange-500 animate-pulse" : "bg-muted-foreground"}`} />
-            <span className="text-muted-foreground">{isSpeaking ? "Speaking..." : "Ready to speak"}</span>
+            {silenceCountdown > 0 && (
+              <span className="text-xs text-orange-500 ml-2">
+                (Auto-stop in {silenceCountdown}s)
+              </span>
+            )}
           </div>
         </div>
       </CardContent>

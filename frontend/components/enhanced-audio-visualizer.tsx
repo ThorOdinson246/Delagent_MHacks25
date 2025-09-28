@@ -165,26 +165,42 @@ class AudioParticle {
   }
 }
 
-interface VoiceVisualizerProps {
+interface EnhancedAudioVisualizerProps {
   isRecording: boolean
   isProcessing: boolean
+  audioLevels?: number[]
   width?: number
   height?: number
+  particleCount?: number
 }
 
-export function VoiceVisualizer({ isRecording, isProcessing, width = 160, height = 160 }: VoiceVisualizerProps) {
+export function EnhancedAudioVisualizer({ 
+  isRecording, 
+  isProcessing, 
+  audioLevels = [],
+  width = 280, 
+  height = 280,
+  particleCount = 120
+}: EnhancedAudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const particlesRef = useRef<AudioParticle[]>([])
   const animationRef = useRef<number>()
-  const [audioLevels, setAudioLevels] = useState<number[]>(Array(24).fill(0))
+  const [simulatedAudioLevels, setSimulatedAudioLevels] = useState<number[]>(Array(particleCount).fill(0))
+  const circleAnimationRef = useRef<number>(0)
 
-  // Simulate audio levels based on recording/processing state
+  // Use provided audioLevels or simulate them based on recording/processing state
   useEffect(() => {
+    if (audioLevels.length > 0) {
+      // Use real audio levels if provided
+      setSimulatedAudioLevels(audioLevels)
+      return
+    }
+
     let interval: NodeJS.Timeout | null = null
 
     if (isRecording || isProcessing) {
       interval = setInterval(() => {
-        setAudioLevels(prev => prev.map(() => {
+        setSimulatedAudioLevels(prev => prev.map(() => {
           if (isRecording) {
             // More dynamic levels when recording
             return Math.random() * 80 + 20
@@ -198,12 +214,12 @@ export function VoiceVisualizer({ isRecording, isProcessing, width = 160, height
     } else {
       // Gradually fade out when idle
       const fadeInterval = setInterval(() => {
-        setAudioLevels(prev => prev.map(level => Math.max(0, level * 0.9)))
+        setSimulatedAudioLevels(prev => prev.map(level => Math.max(0, level * 0.9)))
       }, 50)
       
       setTimeout(() => {
         clearInterval(fadeInterval)
-        setAudioLevels(Array(24).fill(0))
+        setSimulatedAudioLevels(Array(particleCount).fill(0))
       }, 1000)
       
       return () => clearInterval(fadeInterval)
@@ -212,7 +228,7 @@ export function VoiceVisualizer({ isRecording, isProcessing, width = 160, height
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [isRecording, isProcessing])
+  }, [isRecording, isProcessing, audioLevels, particleCount])
 
   // Initialize particles
   useEffect(() => {
@@ -224,16 +240,16 @@ export function VoiceVisualizer({ isRecording, isProcessing, width = 160, height
 
     const centerX = width / 2
     const centerY = height / 2
+    const micRadius = 40 // Minimum radius around the mic icon
     const maxRadius = Math.min(width, height) / 2 - 20
+    const rings = 5
 
-    // Create particles in circular pattern
+    // Create particles in concentric rings around mic icon
     particlesRef.current = []
-    const numberOfRings = 4
-    const particlesPerRing = 6
 
-    for (let ring = 0; ring < numberOfRings; ring++) {
-      const ringRadius = (ring + 1) * (maxRadius / numberOfRings)
-      const particlesInThisRing = particlesPerRing + ring * 2
+    for (let ring = 0; ring < rings; ring++) {
+      const ringRadius = micRadius + ((ring + 1) / rings) * (maxRadius - micRadius)
+      const particlesInThisRing = Math.max(6, Math.floor(particleCount / rings) + ring * 2)
       
       for (let i = 0; i < particlesInThisRing; i++) {
         const angle = (i / particlesInThisRing) * Math.PI * 2
@@ -243,19 +259,19 @@ export function VoiceVisualizer({ isRecording, isProcessing, width = 160, height
         // Use theme colors based on state
         let color: string
         if (isRecording) {
-          color = `hsl(${0 + ring * 10}, 70%, ${60 + ring * 5}%)` // Red theme for recording
+          color = `hsl(${0 + ring * 5}, 70%, ${60 + ring * 3}%)` // Red theme for recording
         } else if (isProcessing) {
-          color = `hsl(${45}, 70%, ${60 + ring * 5}%)` // Yellow theme for processing
+          color = `hsl(${45}, 70%, ${60 + ring * 3}%)` // Yellow theme for processing
         } else {
-          color = `hsl(${220}, 50%, ${40 + ring * 8}%)` // Blue theme for idle
+          color = `hsl(${220}, 50%, ${40 + ring * 5}%)` // Blue theme for idle
         }
 
-        const baseRadius = 1.5 + ring * 0.3
+        const baseRadius = 2 + ring * 0.4
         const particle = new AudioParticle(x, y, baseRadius, color, x, y)
         particlesRef.current.push(particle)
       }
     }
-  }, [width, height, isRecording, isProcessing])
+  }, [width, height, isRecording, isProcessing, particleCount])
 
   // Animation loop
   useEffect(() => {
@@ -266,31 +282,51 @@ export function VoiceVisualizer({ isRecording, isProcessing, width = 160, height
     if (!ctx) return
 
     const animate = () => {
-      // Clear with slight fade effect
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)'
-      ctx.fillRect(0, 0, width, height)
+      // Clear canvas
       ctx.clearRect(0, 0, width, height)
 
       // Calculate average audio level
-      const averageLevel = audioLevels.length > 0 
-        ? audioLevels.reduce((sum, level) => sum + level, 0) / audioLevels.length 
+      const averageLevel = simulatedAudioLevels.length > 0 
+        ? simulatedAudioLevels.reduce((sum, level) => sum + level, 0) / simulatedAudioLevels.length 
         : 0
+
+      // Draw expanding concentric circles during audio activity
+      if (averageLevel > 10) {
+        const centerX = width / 2
+        const centerY = height / 2
+        circleAnimationRef.current += 0.05
+
+        for (let i = 0; i < 3; i++) {
+          const radius = 60 + i * 30 + Math.sin(circleAnimationRef.current + i) * 10
+          const opacity = (averageLevel / 100) * (0.3 - i * 0.1)
+          
+          ctx.beginPath()
+          ctx.strokeStyle = isRecording 
+            ? `rgba(239, 68, 68, ${opacity})` // Red
+            : isProcessing 
+            ? `rgba(245, 158, 11, ${opacity})` // Yellow
+            : `rgba(59, 130, 246, ${opacity})` // Blue
+          ctx.lineWidth = 2
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2)
+          ctx.stroke()
+        }
+      }
 
       // Update particle colors based on current state
       particlesRef.current.forEach((particle, index) => {
-        const ring = Math.floor(index / 8)
+        const ring = Math.floor(index / Math.ceil(particleCount / 5))
         if (isRecording) {
-          particle.color = `hsl(${0 + ring * 10}, 70%, ${60 + ring * 5}%)`
+          particle.color = `hsl(${0 + ring * 5}, 70%, ${60 + ring * 3}%)`
         } else if (isProcessing) {
-          particle.color = `hsl(${45}, 70%, ${60 + ring * 5}%)`
+          particle.color = `hsl(${45}, 70%, ${60 + ring * 3}%)`
         } else {
-          particle.color = `hsl(${220}, 50%, ${40 + ring * 8}%)`
+          particle.color = `hsl(${220}, 50%, ${40 + ring * 5}%)`
         }
       })
 
       // Update and draw particles
       particlesRef.current.forEach((particle, index) => {
-        const individualLevel = audioLevels[index % audioLevels.length] || averageLevel
+        const individualLevel = simulatedAudioLevels[index % simulatedAudioLevels.length] || averageLevel
         particle.update(particlesRef.current, width, height, individualLevel)
         particle.draw(ctx)
       })
@@ -305,7 +341,7 @@ export function VoiceVisualizer({ isRecording, isProcessing, width = 160, height
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [audioLevels, width, height, isRecording, isProcessing])
+  }, [simulatedAudioLevels, width, height, isRecording, isProcessing, particleCount])
 
   return (
     <div className="relative flex items-center justify-center">
@@ -315,28 +351,23 @@ export function VoiceVisualizer({ isRecording, isProcessing, width = 160, height
         style={{ width: `${width}px`, height: `${height}px` }}
       />
       
-      {/* Center microphone icon */}
-      <div className={`absolute w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+      {/* Central microphone icon */}
+      <div className={`absolute w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
         isRecording 
-          ? 'bg-red-500/20 shadow-lg shadow-red-500/50' 
+          ? 'bg-red-50 border-2 border-red-400 shadow-lg shadow-red-200/50' 
           : isProcessing
-          ? 'bg-yellow-500/20 shadow-lg shadow-yellow-500/50'
-          : 'bg-primary/20'
+          ? 'bg-yellow-50 border-2 border-yellow-400 shadow-lg shadow-yellow-200/50'
+          : 'bg-white border-2 border-gray-300 shadow-lg shadow-gray-200/50'
       }`}>
         {isRecording ? (
           <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
         ) : isProcessing ? (
           <div className="w-3 h-3 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
         ) : (
-          <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+          <svg className="w-8 h-8 text-black" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 715 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
           </svg>
         )}
-      </div>
-      
-      {/* Status text */}
-      <div className="absolute -bottom-6 text-xs text-center text-muted-foreground font-medium">
-        {isRecording ? "Recording..." : isProcessing ? "Processing..." : "Ready"}
       </div>
     </div>
   )

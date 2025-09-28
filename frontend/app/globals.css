@@ -165,3 +165,10 @@ body {
 .status-failed {
   background: linear-gradient(90deg, hsl(0 62.8% 30.6%), hsl(0 84% 37%));
 }
+
+/* Grid pattern for full-page voice interface */
+.grid-pattern {
+  background-image: linear-gradient(rgba(139, 92, 246, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139, 92, 246, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
