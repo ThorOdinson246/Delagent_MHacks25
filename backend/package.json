@@ -1,0 +1,18 @@
+{
+  "name": "agentschedule-backend",
+  "version": "1.0.0",
+  "description": "Backend server for the AGENTSCHEDULE voice-first platform.",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "author": "",
+  "license": "ISC"
+}

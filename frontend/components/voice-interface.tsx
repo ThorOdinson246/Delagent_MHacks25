@@ -1,0 +1,469 @@
+"use client"
+
+import { useState, useRef, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Mic, MicOff, Send, Calendar } from "lucide-react"
+import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/api"
+
+import { audioRecorderService } from "@/lib/audio-recorder-service"
+import { voiceService } from "@/lib/voice-service"
+import { EnhancedAudioVisualizer } from "./enhanced-audio-visualizer"
+
+// Speech Recognition types are handled by the DOM lib
+
+export function VoiceInterface() {
+  const [isListening, setIsListening] = useState(false)
+  const [transcript, setTranscript] = useState("")
+  const [meetingRequest, setMeetingRequest] = useState<MeetingRequest>({
+    title: "",
+    preferred_date: "",
+    preferred_time: "",
+    duration_minutes: 60,
+  })
+  const [negotiationResult, setNegotiationResult] = useState<NegotiationResult | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [silenceCountdown, setSilenceCountdown] = useState(0)
+  const [audioLevels, setAudioLevels] = useState<number[]>([])
+
+  const recognition = useRef<any | null>(null)
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      recognition.current = new SpeechRecognition()
+      recognition.current.continuous = true
+      recognition.current.interimResults = true
+      recognition.current.lang = "en-US"
+
+      recognition.current.onresult = (event: any) => {
+        let finalTranscript = ""
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript
+          }
+        }
+        if (finalTranscript) {
+          setTranscript((prev) => prev + " " + finalTranscript)
+          // Use fallback for real-time parsing, full orchestration on recording complete
+          parseVoiceCommandFallback(finalTranscript)
+        }
+      }
+
+      recognition.current.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error)
+        setIsListening(false)
+      }
+
+      recognition.current.onend = () => {
+        setIsListening(false)
+      }
+    }
+  }, [])
+
+  const handleVoiceOrchestration = async (transcript: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Send to Gemini-powered orchestrator instead of local parsing
+      console.log("Sending transcript to voice orchestrator:", transcript)
+      const result = await voiceService.processVoiceCommand(transcript, "schedule")
+      
+      console.log("Voice orchestrator response:", result)
+      
+      // Update meeting request from Gemini's structured output
+      if (result.context?.originalRequest) {
+        setMeetingRequest(result.context.originalRequest)
+      }
+      
+      // Set negotiation result for UI display
+      if (result.context?.negotiationResult) {
+        setNegotiationResult(result.context.negotiationResult)
+      }
+      
+      // Log the AI-generated response (TTS functionality removed)
+      if (result.spokenResponse) {
+        console.log("AI response:", result.spokenResponse)
+      }
+      
+    } catch (err) {
+      console.error("Voice orchestration failed:", err)
+      setError(err instanceof Error ? err.message : "Voice command processing failed")
+      
+      // Fallback to local parsing if orchestrator fails
+      parseVoiceCommandFallback(transcript)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fallback parsing (simplified version of original)
+  const parseVoiceCommandFallback = (command: string) => {
+    const lowerCommand = command.toLowerCase()
+
+    // Extract meeting title
+    const titleMatch = lowerCommand.match(/schedule (?:a )?(.+?) (?:with|for|on|at|tomorrow|today)/)
+    if (titleMatch) {
+      setMeetingRequest((prev) => ({ ...prev, title: titleMatch[1] }))
+    }
+
+    // Extract date  
+    if (lowerCommand.includes("tomorrow")) {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      setMeetingRequest((prev) => ({ ...prev, preferred_date: tomorrow.toISOString().split("T")[0] }))
+    } else if (lowerCommand.includes("today")) {
+      const today = new Date()
+      setMeetingRequest((prev) => ({ ...prev, preferred_date: today.toISOString().split("T")[0] }))
+    }
+
+    // Extract time
+    const timeMatch = lowerCommand.match(/at (\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
+    if (timeMatch) {
+      let hour = Number.parseInt(timeMatch[1])
+      const minute = timeMatch[2] ? Number.parseInt(timeMatch[2]) : 0
+      const ampm = timeMatch[3]
+
+      if (ampm === "pm" && hour !== 12) hour += 12
+      if (ampm === "am" && hour === 12) hour = 0
+
+      const timeString = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+      setMeetingRequest((prev) => ({ ...prev, preferred_time: timeString }))
+    }
+  }
+
+  // Separate function to stop recording and process to avoid infinite loops
+  const stopRecordingAndProcess = async () => {
+    if (!isRecording) return
+    
+    try {
+      setIsListening(true) // Show processing state
+      setError(null)
+      console.log("Stopping recording...")
+      
+      const audioBlob = await audioRecorderService.stopRecording()
+      console.log("Audio recorded, sending for transcription...")
+      
+      const transcribedText = await audioRecorderService.sendAudioToSTT(audioBlob)
+      console.log("Transcription received:", transcribedText)
+      
+      if (transcribedText.trim()) {
+        setTranscript(transcribedText)
+        await handleVoiceOrchestration(transcribedText)
+      } else {
+        setError("No speech detected. Please try speaking louder or closer to the microphone.")
+      }
+      
+      setIsRecording(false)
+      setIsListening(false)
+      setSilenceCountdown(0)
+    } catch (err) {
+      console.error("Failed to process recording:", err)
+      setError(err instanceof Error ? err.message : "Failed to process recording")
+      setIsRecording(false)
+      setIsListening(false)
+      setSilenceCountdown(0)
+    }
+  }
+
+  const toggleListening = async () => {
+    if (isRecording) {
+      await stopRecordingAndProcess()
+    } else {
+      // Start recording
+      try {
+        setError(null)
+        setSilenceCountdown(0)
+        console.log("Checking permissions...")
+        
+        const hasPermission = await audioRecorderService.checkPermissions()
+        if (!hasPermission) {
+          setError("Microphone permission is required. Please allow microphone access.")
+          return
+        }
+        
+        // Set up callbacks for auto-stop and audio levels
+        audioRecorderService.setAutoStopCallback(stopRecordingAndProcess)
+        audioRecorderService.setCountdownCallback(setSilenceCountdown)
+        audioRecorderService.setAudioLevelCallback(setAudioLevels)
+        
+        console.log("Starting recording...")
+        await audioRecorderService.startRecording()
+        setIsRecording(true)
+        setIsListening(false) // We're recording, not processing
+      } catch (err) {
+        console.error("Failed to start recording:", err)
+        setError(err instanceof Error ? err.message : "Failed to start recording. Please check microphone permissions.")
+        setIsRecording(false)
+        setIsListening(false)
+        setSilenceCountdown(0)
+      }
+    }
+  }
+
+  const handleNegotiateMeeting = async () => {
+    if (!meetingRequest.title || !meetingRequest.preferred_date || !meetingRequest.preferred_time) {
+      setError("Please provide meeting title, date, and time")
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await apiService.negotiateMeeting(meetingRequest)
+      setNegotiationResult(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to negotiate meeting")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleScheduleMeeting = async (slotIndex: number) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const result = await apiService.scheduleMeeting(meetingRequest, slotIndex)
+      setNegotiationResult(result)
+      if (result.success) {
+        // Clear form after successful scheduling
+        setMeetingRequest({
+          title: "",
+          preferred_date: "",
+          preferred_time: "",
+          duration_minutes: 60,
+        })
+        setTranscript("")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to schedule meeting")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
+
+  return (
+    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Mic className="w-5 h-5 text-primary" />
+          Voice Interface
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Voice Visualization */}
+        <div className="relative h-64 rounded-lg flex items-center justify-center overflow-hidden">
+          <EnhancedAudioVisualizer 
+            isRecording={isRecording} 
+            isProcessing={isListening} 
+            audioLevels={audioLevels}
+            width={280}
+            height={280}
+            particleCount={120}
+          />
+          {silenceCountdown > 0 && (
+            <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm border border-gray-300 text-gray-800 px-3 py-1 rounded-full text-sm font-medium shadow-lg">
+              Auto-stop in {silenceCountdown}s
+            </div>
+          )}
+        </div>
+
+        {/* Controls */}
+        <div className="flex justify-center gap-4">
+          <Button
+            size="lg"
+            onClick={toggleListening}
+            disabled={isListening}
+            className={
+              isRecording
+                ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                : isListening 
+                ? "bg-yellow-500 hover:bg-yellow-600"
+                : "bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90"
+            }
+          >
+            {isRecording ? (
+              <>
+                <MicOff className="w-5 h-5 mr-2" />
+                Stop Recording
+              </>
+            ) : isListening ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Processing...
+              </>
+            ) : (
+              <>
+                <Mic className="w-5 h-5 mr-2" />
+                Start Recording
+              </>
+            )}
+          </Button>
+
+
+        </div>
+
+        {/* Transcript */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">
+              Live Transcript 
+              <span className="text-xs text-muted-foreground ml-2">
+                ({transcript.trim() ? transcript.trim().split(/\s+/).length : 0} words)
+              </span>
+            </h4>
+            {transcript && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTranscript("")}
+                className="text-xs h-6"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          <div className="min-h-[80px] p-3 bg-muted/20 rounded-lg text-sm border border-border/50">
+            {transcript || (
+              <div className="text-muted-foreground italic">
+                Start recording to see your speech transcribed here...
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Meeting Request Form */}
+        <div className="space-y-4">
+          <h4 className="text-sm font-medium">Meeting Request</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={meetingRequest.title}
+                onChange={(e) => setMeetingRequest((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="Meeting title"
+              />
+            </div>
+            <div>
+              <Label htmlFor="duration">Duration (minutes)</Label>
+              <Input
+                id="duration"
+                type="number"
+                value={meetingRequest.duration_minutes}
+                onChange={(e) =>
+                  setMeetingRequest((prev) => ({ ...prev, duration_minutes: Number.parseInt(e.target.value) || 60 }))
+                }
+                placeholder="60"
+              />
+            </div>
+            <div>
+              <Label htmlFor="date">Preferred Date</Label>
+              <Input
+                id="date"
+                type="date"
+                value={meetingRequest.preferred_date}
+                onChange={(e) => setMeetingRequest((prev) => ({ ...prev, preferred_date: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="time">Preferred Time</Label>
+              <Input
+                id="time"
+                type="time"
+                value={meetingRequest.preferred_time}
+                onChange={(e) => setMeetingRequest((prev) => ({ ...prev, preferred_time: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <Button
+            onClick={handleNegotiateMeeting}
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-primary to-blue-500"
+          >
+            <Calendar className="w-4 h-4 mr-2" />
+            {loading ? "Finding Available Slots..." : "Find Available Times"}
+          </Button>
+        </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Negotiation Results */}
+        {negotiationResult && (
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium">Available Time Slots</h4>
+            {negotiationResult.available_slots.length === 0 ? (
+              <div className="p-3 bg-muted/20 rounded-lg text-sm text-muted-foreground">
+                No available slots found for the requested time.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {negotiationResult.available_slots.map((slot, index) => (
+                  <div key={index} className="p-3 bg-muted/20 rounded-lg flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">
+                        {slot.day_of_week}, {slot.date_formatted}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {slot.time_formatted} -{" "}
+                        {new Date(slot.end_time).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Quality Score: {slot.quality_score}</div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleScheduleMeeting(index)}
+                      disabled={loading}
+                      className="bg-gradient-to-r from-primary to-blue-500"
+                    >
+                      <Send className="w-4 h-4 mr-1" />
+                      Schedule
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Status */}
+        <div className="flex items-center justify-center text-sm">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${
+              isRecording ? "bg-red-500 animate-pulse" : 
+              isListening ? "bg-yellow-500 animate-pulse" : 
+              "bg-muted-foreground"
+            }`} />
+            <span className="text-muted-foreground">
+              {isRecording ? "Recording..." : 
+               isListening ? "Processing..." : 
+               "Ready to record"}
+            </span>
+            {silenceCountdown > 0 && (
+              <span className="text-xs text-orange-500 ml-2">
+                (Auto-stop in {silenceCountdown}s)
+              </span>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
