@@ -1,0 +1,85 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Port 3001 is in use, trying 3002 instead.
+  ▲ Next.js 14.2.16
+  - Local:        http://localhost:3002
+
+ ✓ Starting...
+ ✓ Ready in 1443ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.1s (490 modules)
+ GET / 200 in 2282ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1027ms (730 modules)
+ ✓ Compiled /api/stt in 145ms (406 modules)
+Received audio file: recording.wav 113835 bytes type: audio/wav
+Cartesia STT result: {
+  type: 'transcript',
+  duration: 7.08,
+  language: 'en',
+  is_final: false,
+  request_id: '33121db7-4846-4c1d-baa3-2a0577e962a7',
+  text: "Hey, can you set up an appointment today at 10 o'clock?"
+}
+ POST /api/stt 200 in 891ms
+ ○ Compiling /api/tts ...
+ ✓ Compiled /api/tts in 937ms (821 modules)
+ POST /api/tts 200 in 3038ms
+ ✓ Compiled /_not-found in 142ms (1164 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 205ms
+ ✓ Compiled in 448ms (726 modules)
+ ✓ Compiled in 702ms (726 modules)
+ ✓ Compiled in 279ms (726 modules)
+ ✓ Compiled in 353ms (726 modules)
+ ✓ Compiled in 380ms (726 modules)
+ ✓ Compiled in 261ms (726 modules)
+ ✓ Compiled in 310ms (732 modules)
+ ✓ Compiled in 298ms (732 modules)
+ ✓ Compiled in 271ms (732 modules)
+ ✓ Compiled in 261ms (732 modules)
+ ✓ Compiled in 677ms (732 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz_' -> '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 632ms (732 modules)
+ ✓ Compiled in 243ms (732 modules)
+ ✓ Compiled in 249ms (726 modules)
+ ✓ Compiled in 259ms (354 modules)
+ ✓ Compiled in 224ms (354 modules)
+ ✓ Compiled in 246ms (726 modules)
+ ✓ Compiled in 363ms (730 modules)
+ ✓ Compiled in 328ms (730 modules)
+ ✓ Compiled in 294ms (730 modules)
+ ✓ Compiled in 271ms (730 modules)
+ ✓ Compiled in 270ms (732 modules)
+ ✓ Compiled in 365ms (732 modules)
+ ✓ Compiled in 634ms (732 modules)
+ ✓ Compiled in 282ms (732 modules)
+ ✓ Compiled in 306ms (732 modules)
+ ✓ Compiled in 413ms (732 modules)
+ ✓ Compiled in 281ms (732 modules)
+ ✓ Compiled in 331ms (732 modules)
+ ✓ Compiled in 365ms (732 modules)
+ ✓ Compiled in 306ms (732 modules)
+ ✓ Compiled in 394ms (732 modules)
+ ✓ Compiled in 304ms (732 modules)
+ ✓ Compiled in 353ms (732 modules)
+ ✓ Compiled in 295ms (732 modules)
+ ✓ Compiled in 401ms (732 modules)
+ ✓ Compiled in 300ms (732 modules)
+ ✓ Compiled in 619ms (732 modules)
+ ✓ Compiled in 304ms (732 modules)
+ ✓ Compiled in 199ms (357 modules)
+ ✓ Compiled in 283ms (732 modules)
+ ✓ Compiled in 249ms (732 modules)
+ ✓ Compiled in 268ms (732 modules)
+ ✓ Compiled in 265ms (732 modules)
+ ✓ Compiled in 594ms (728 modules)
+ ✓ Compiled in 268ms (728 modules)
+ ✓ Compiled in 194ms (355 modules)
+ ✓ Compiled in 178ms (355 modules)
+ ✓ Compiled in 260ms (728 modules)
+ ✓ Compiled in 267ms (728 modules)
+ ✓ Compiled in 241ms (728 modules)
+[?25h

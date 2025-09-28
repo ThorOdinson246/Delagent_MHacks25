@@ -13,9 +13,10 @@ class AudioRecorderService {
   private audioLevelCallback: ((levels: number[]) => void) | null = null;
   
   // VAD Configuration
-  private silenceThreshold: number = 12; // Audio level below this is silence
+  private silenceThreshold: number = 20; // Audio level below this is silence (increased sensitivity)
   private silenceTimeout: number = 3000; // Auto-stop after 3 seconds
   private isAutoStopTriggered: boolean = false; // Guard against multiple auto-stop calls
+  private debugMode: boolean = false; // Enable debug logging
 
   async checkPermissions(): Promise<boolean> {
     try {
@@ -142,6 +143,11 @@ class AudioRecorderService {
       // Calculate average audio level
       const average = this.dataArray.reduce((sum, value) => sum + value, 0) / this.dataArray.length;
       
+      // Debug logging for audio levels
+      if (this.debugMode && Math.random() < 0.1) { // Log 10% of samples to avoid spam
+        console.log(`Audio level: ${average.toFixed(1)} (threshold: ${this.silenceThreshold})`);
+      }
+      
       // Update audio levels for visualizer
       this.audioLevels = Array.from(this.dataArray).map(value => (value / 255) * 100);
       if (this.audioLevelCallback) {
@@ -164,13 +170,17 @@ class AudioRecorderService {
           }
           
           // Auto-stop if silence duration exceeds threshold
-          if (silenceDuration > this.silenceTimeout && !this.isAutoStopTriggered) {
-            console.log("Auto-stopping recording due to silence");
+          if (silenceDuration >= this.silenceTimeout && !this.isAutoStopTriggered) {
+            console.log(`Auto-stopping recording due to ${silenceDuration}ms of silence (threshold: ${this.silenceTimeout}ms)`);
             this.isAutoStopTriggered = true; // Set guard
             this.stopSilenceDetection(); // Stop first to prevent multiple calls
-            if (this.autoStopCallback) {
-              this.autoStopCallback();
-            }
+            
+            // Use setTimeout to ensure callback runs after current execution
+            setTimeout(() => {
+              if (this.autoStopCallback) {
+                this.autoStopCallback();
+              }
+            }, 10);
           }
         }
       } else {
@@ -271,6 +281,22 @@ class AudioRecorderService {
     console.log("STT API response:", result);
     
     return result.transcript || "";
+  }
+
+  enableDebugMode(enabled: boolean = true) {
+    this.debugMode = enabled;
+    console.log(`Audio recorder debug mode ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  configureSilenceDetection(threshold?: number, timeout?: number) {
+    if (threshold !== undefined) {
+      this.silenceThreshold = threshold;
+      console.log(`Silence threshold set to ${threshold}`);
+    }
+    if (timeout !== undefined) {
+      this.silenceTimeout = timeout;
+      console.log(`Silence timeout set to ${timeout}ms`);
+    }
   }
 }
 

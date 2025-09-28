@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Users, Brain, Calendar, RefreshCw } from "lucide-react"
+import { ChevronLeft, ChevronRight, Users, Brain, Calendar, RefreshCw, X, Clock, User, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { apiService, type CalendarBlock, type Meeting } from "@/lib/api"
 
@@ -14,21 +14,28 @@ export function CalendarView() {
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
+  const [expandedBlock, setExpandedBlock] = useState<string | null>(null)
 
   const fetchCalendarData = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Fetch calendar blocks for both users
-      const [bobCalendar, aliceCalendar, meetingsData] = await Promise.all([
+      // Fetch calendar blocks for all three users
+      const [bobCalendar, aliceCalendar, charlieCalendar, meetingsData] = await Promise.all([
         apiService.getUserCalendar("bob"),
         apiService.getUserCalendar("alice"),
+        apiService.getUserCalendar("charlie").catch(() => []), // Fallback to empty array if Charlie's calendar fails
         apiService.getMeetings(),
       ])
 
-      // Combine calendar blocks from both users
-      const allBlocks = [...bobCalendar.calendar_blocks, ...aliceCalendar.calendar_blocks]
+      // Combine calendar blocks from all users
+      const allBlocks = [
+        ...bobCalendar.calendar_blocks, 
+        ...aliceCalendar.calendar_blocks,
+        ...(charlieCalendar.calendar_blocks || [])
+      ]
       setCalendarBlocks(allBlocks)
       setMeetings(meetingsData.meetings)
     } catch (err) {
@@ -36,6 +43,28 @@ export function CalendarView() {
       console.error("Error fetching calendar data:", err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const deleteCalendarBlock = async (blockId: string) => {
+    try {
+      await apiService.deleteCalendarBlock(blockId)
+      // Refresh calendar data after deletion
+      await fetchCalendarData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete calendar block")
+      console.error("Error deleting calendar block:", err)
+    }
+  }
+
+  const deleteMeeting = async (meetingId: string) => {
+    try {
+      await apiService.deleteMeeting(meetingId)
+      // Refresh calendar data after deletion
+      await fetchCalendarData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete meeting")
+      console.error("Error deleting meeting:", err)
     }
   }
 
@@ -100,15 +129,15 @@ export function CalendarView() {
   const getBlockTypeColor = (blockType: string) => {
     switch (blockType) {
       case "focus_time":
-        return "bg-purple-500/20 border-purple-500/50 text-purple-300"
+        return "bg-gradient-to-r from-purple-500/30 to-indigo-600/30 border-purple-400/60 text-black shadow-lg shadow-purple-500/20"
       case "busy":
-        return "bg-red-500/20 border-red-500/50 text-red-300"
+        return "bg-gradient-to-r from-orange-500/30 to-red-600/30 border-orange-400/60 text-black shadow-lg shadow-orange-500/20"
       case "available":
-        return "bg-green-500/20 border-green-500/50 text-green-300"
+        return "bg-gradient-to-r from-green-500/30 to-emerald-600/30 border-green-400/60 text-black shadow-lg shadow-green-500/20"
       case "flexible":
-        return "bg-blue-500/20 border-blue-500/50 text-blue-300"
+        return "bg-gradient-to-r from-blue-500/30 to-cyan-600/30 border-blue-400/60 text-black shadow-lg shadow-blue-500/20"
       default:
-        return "bg-gray-500/20 border-gray-500/50 text-gray-300"
+        return "bg-gradient-to-r from-gray-500/30 to-slate-600/30 border-gray-400/60 text-black shadow-lg shadow-gray-500/20"
     }
   }
 
@@ -116,15 +145,15 @@ export function CalendarView() {
     switch (status.toLowerCase()) {
       case "negotiating":
       case "pending":
-        return "bg-yellow-500/20 border-yellow-500/50 text-yellow-300"
+        return "bg-gradient-to-r from-amber-500/30 to-orange-600/30 border-amber-400/60 text-black shadow-lg shadow-amber-500/20"
       case "agreed":
       case "scheduled":
-        return "bg-green-500/20 border-green-500/50 text-green-300"
+        return "bg-gradient-to-r from-emerald-500/30 to-green-600/30 border-emerald-400/60 text-black shadow-lg shadow-emerald-500/20"
       case "failed":
       case "cancelled":
-        return "bg-red-500/20 border-red-500/50 text-red-300"
+        return "bg-gradient-to-r from-red-500/30 to-rose-600/30 border-red-400/60 text-black shadow-lg shadow-red-500/20"
       default:
-        return "bg-gray-500/20 border-gray-500/50 text-gray-300"
+        return "bg-gradient-to-r from-slate-500/30 to-gray-600/30 border-slate-400/60 text-black shadow-lg shadow-slate-500/20"
     }
   }
 
@@ -178,20 +207,51 @@ export function CalendarView() {
               </Button>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Button variant={view === "month" ? "default" : "outline"} size="sm" onClick={() => setView("month")}>
-                Month
-              </Button>
-              <Button variant={view === "week" ? "default" : "outline"} size="sm" onClick={() => setView("week")}>
-                Week
-              </Button>
-              <Button variant={view === "day" ? "default" : "outline"} size="sm" onClick={() => setView("day")}>
-                Day
-              </Button>
-              <Button onClick={fetchCalendarData} variant="outline" size="sm">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
+            <div className="flex items-center space-x-4">
+              {/* Color Legend */}
+              <div className="flex items-center space-x-3 text-sm">
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 rounded bg-gradient-to-r from-purple-500/30 to-indigo-600/30 border border-purple-400/60"></div>
+                  <span className="text-muted-foreground">Focus Time</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 rounded bg-gradient-to-r from-orange-500/30 to-red-600/30 border border-orange-400/60"></div>
+                  <span className="text-muted-foreground">Busy</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 rounded bg-gradient-to-r from-green-500/30 to-emerald-600/30 border border-green-400/60"></div>
+                  <span className="text-muted-foreground">Available</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-3 h-3 rounded bg-gradient-to-r from-blue-500/30 to-cyan-600/30 border border-blue-400/60"></div>
+                  <span className="text-muted-foreground">Flexible</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Button variant={view === "month" ? "default" : "outline"} size="sm" onClick={() => {
+                  setView("month")
+                  setExpandedBlock(null)
+                }}>
+                  Month
+                </Button>
+                <Button variant={view === "week" ? "default" : "outline"} size="sm" onClick={() => {
+                  setView("week")
+                  setExpandedBlock(null)
+                }}>
+                  Week
+                </Button>
+                <Button variant={view === "day" ? "default" : "outline"} size="sm" onClick={() => {
+                  setView("day")
+                  setExpandedBlock(null)
+                }}>
+                  Day
+                </Button>
+                <Button onClick={fetchCalendarData} variant="outline" size="sm">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -231,11 +291,16 @@ export function CalendarView() {
                       return (
                         <div
                           key={index}
-                          className={`min-h-[100px] p-2 rounded-lg border transition-all hover:bg-background/50 ${
+                          className={`min-h-[100px] p-2 rounded-lg border transition-all hover:bg-background/50 cursor-pointer ${
                             isCurrentMonth
                               ? "border-border/50 bg-background/20"
                               : "border-border/20 bg-background/10 opacity-50"
                           } ${isToday ? "ring-2 ring-primary/50" : ""}`}
+                          onClick={() => {
+                            if (isCurrentMonth) {
+                              setSelectedDay(day)
+                            }
+                          }}
                         >
                           <div
                             className={`text-sm font-medium mb-1 ${
@@ -248,8 +313,8 @@ export function CalendarView() {
                           <div className="space-y-1">
                             {dayEvents.slice(0, 2).map((event) => (
                               <div
-                                key={event.id}
-                                className={`text-xs p-1 rounded border ${getBlockTypeColor(event.block_type)} truncate`}
+                                key={event.id || `event-${event.start_time}-${event.end_time}`}
+                                className={`text-xs p-1 rounded border ${getBlockTypeColor(event.block_type)} truncate text-black`}
                                 title={`${event.title} (${event.user_id === "bob" ? "Bob" : "Alice"})`}
                               >
                                 {event.title}
@@ -268,33 +333,77 @@ export function CalendarView() {
 
               {view !== "month" && (
                 <div className="space-y-3">
-                  {calendarBlocks.map((block) => (
-                    <div
-                      key={block.id}
-                      className={`p-3 rounded-lg border ${getBlockTypeColor(block.block_type)} transition-all hover:scale-[1.02]`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">{block.title}</h4>
-                          <p className="text-sm opacity-80">
-                            {formatDate(block.start_time)} • {formatTime(block.start_time)} -{" "}
-                            {formatTime(block.end_time)}
-                          </p>
-                          <p className="text-xs opacity-60">{block.user_id === "bob" ? "Bob" : "Alice"}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline" className="text-xs">
-                            Priority {block.priority_level}
-                          </Badge>
-                          {block.is_flexible && (
-                            <Badge variant="outline" className="text-xs bg-blue-500/20">
-                              Flexible
-                            </Badge>
+                  {calendarBlocks.map((block) => {
+                    const isExpanded = expandedBlock === block.id
+                    return (
+                      <div
+                        key={block.id || `block-${block.start_time}-${block.end_time}`}
+                        className={`rounded-lg border ${getBlockTypeColor(block.block_type)} transition-all duration-300 cursor-pointer ${
+                          isExpanded ? "scale-105 shadow-xl ring-2 ring-primary/50" : "hover:scale-[1.02]"
+                        }`}
+                        onClick={() => {
+                          // Simple toggle logic - if this block is expanded, collapse it
+                          // If it's not expanded, expand it (this automatically collapses any other expanded block)
+                          setExpandedBlock(isExpanded ? null : block.id)
+                        }}
+                      >
+                        <div className={`p-3 ${isExpanded ? "pb-4" : ""}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-black">{block.title}</h4>
+                              <p className="text-sm text-black">
+                                {formatDate(block.start_time)} • {formatTime(block.start_time)} -{" "}
+                                {formatTime(block.end_time)}
+                              </p>
+                              <p className="text-xs text-black">{block.user_id === "bob" ? "Bob" : "Alice"}</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline" className="text-xs">
+                                Priority {block.priority_level}
+                              </Badge>
+                              {block.is_flexible && (
+                                <Badge variant="outline" className="text-xs bg-cyan-500/20">
+                                  Flexible
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {isExpanded && (
+                            <div className="mt-4 pt-4 border-t border-black/20 space-y-3 animate-in slide-in-from-top-2 duration-300">
+                              <div className="grid grid-cols-2 gap-4 text-sm text-black">
+                                <div className="flex items-center space-x-2">
+                                  <Clock className="w-4 h-4 text-black" />
+                                  <span>Duration: {Math.round((new Date(block.end_time).getTime() - new Date(block.start_time).getTime()) / (1000 * 60))} min</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <User className="w-4 h-4 text-black" />
+                                  <span>Owner: {block.user_id === "bob" ? "Bob" : "Alice"}</span>
+                                </div>
+                              </div>
+                              <div className="text-sm text-black">
+                                <strong>Block Type:</strong> {block.block_type.replace('_', ' ').toUpperCase()}
+                              </div>
+                              <div className="flex justify-end mt-3">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    deleteCalendarBlock(block.id)
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
@@ -316,10 +425,20 @@ export function CalendarView() {
                   <div className="text-center py-4 text-muted-foreground">No meeting requests found</div>
                 ) : (
                   meetings.map((meeting) => (
-                    <div key={meeting.id} className="p-4 rounded-lg border border-border/50 bg-background/50 space-y-3">
+                    <div key={meeting.id || `meeting-${meeting.preferred_start_time}-${meeting.preferred_end_time}`} className="p-4 rounded-lg border border-border/50 bg-background/50 space-y-3">
                       <div className="flex items-start justify-between">
                         <h4 className="font-medium">{meeting.title}</h4>
-                        <Badge className={getStatusColor(meeting.status)}>{meeting.status}</Badge>
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getStatusColor(meeting.status)}>{meeting.status}</Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteMeeting(meeting.id)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 p-1 h-6 w-6"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="space-y-2 text-sm">
@@ -385,6 +504,153 @@ export function CalendarView() {
           </Card>
         </div>
       </div>
+
+      {/* Day Details Modal */}
+      {selectedDay && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border border-border/50 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-border/50">
+              <h3 className="text-xl font-bold">
+                {selectedDay.toLocaleDateString("en-US", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSelectedDay(null)}
+                className="hover:bg-destructive/10"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {(() => {
+                const dayEvents = getEventsForDay(selectedDay)
+                const dayMeetings = meetings.filter(meeting => {
+                  const meetingDate = new Date(meeting.preferred_start_time).toISOString().split("T")[0]
+                  const selectedDate = selectedDay.toISOString().split("T")[0]
+                  return meetingDate === selectedDate
+                })
+
+                if (dayEvents.length === 0 && dayMeetings.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>No events scheduled for this day</p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {/* Calendar Blocks */}
+                    {dayEvents.length > 0 && (
+                      <div>
+                        <h4 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+                          <Calendar className="w-5 h-5" />
+                          <span>Calendar Blocks ({dayEvents.length})</span>
+                        </h4>
+                        <div className="space-y-3">
+                          {dayEvents.map((block) => (
+                            <div
+                              key={block.id || `block-${block.start_time}-${block.end_time}`}
+                              className={`p-4 rounded-lg border ${getBlockTypeColor(block.block_type)}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h5 className="font-medium text-black">{block.title}</h5>
+                                  <p className="text-sm text-black">
+                                    {formatTime(block.start_time)} - {formatTime(block.end_time)}
+                                  </p>
+                                  <p className="text-xs text-black">{block.user_id === "bob" ? "Bob" : "Alice"}</p>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    Priority {block.priority_level}
+                                  </Badge>
+                                  {block.is_flexible && (
+                                    <Badge variant="outline" className="text-xs bg-cyan-500/20">
+                                      Flexible
+                                    </Badge>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      deleteCalendarBlock(block.id)
+                                      setSelectedDay(null) // Close modal after deletion
+                                    }}
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 p-1 h-6 w-6"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Meetings */}
+                    {dayMeetings.length > 0 && (
+                      <div>
+                        <h4 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+                          <Users className="w-5 h-5" />
+                          <span>Meetings ({dayMeetings.length})</span>
+                        </h4>
+                        <div className="space-y-3">
+                          {dayMeetings.map((meeting) => (
+                            <div
+                              key={meeting.id || `meeting-${meeting.preferred_start_time}-${meeting.preferred_end_time}`}
+                              className="p-4 rounded-lg border border-border/50 bg-background/50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h5 className="font-medium text-black">{meeting.title}</h5>
+                                  <p className="text-sm text-black">
+                                    Duration: {meeting.duration_minutes} minutes
+                                  </p>
+                                  {meeting.final_scheduled_time && (
+                                    <p className="text-sm text-black">
+                                      Scheduled: {formatTime(meeting.final_scheduled_time)}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Badge className={getStatusColor(meeting.status)}>
+                                    {meeting.status}
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      deleteMeeting(meeting.id)
+                                      setSelectedDay(null) // Close modal after deletion
+                                    }}
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 p-1 h-6 w-6"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

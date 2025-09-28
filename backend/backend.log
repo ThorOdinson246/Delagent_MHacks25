@@ -1,0 +1,20 @@
+
+> agentschedule-backend@1.0.0 start
+> node app.js
+
+Server is running on http://localhost:3001
+WebSocket server is running on ws://localhost:3001
+[Node Backend] Step 1: Received transcript: "Hey, can you set up an appointment today at 10 o'clock?"
+🔧 Using mock Gemini response for development
+[Node Backend] Step 2: Extracted meeting details from transcript: {
+  title: 'appointment',
+  preferred_date: '2025-09-29',
+  preferred_time: '14:00',
+  duration_minutes: 60,
+  specific_agent: null
+}
+[Node Backend] Step 3: Sending extracted details to Python backend...
+Error processing voice command: Error: Python backend error: 500 Internal Server Error
+    at file:///home/pappu/MHacks2025/backend/routes/api.js:227:23
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+Killed

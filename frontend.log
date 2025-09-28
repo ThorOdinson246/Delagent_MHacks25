@@ -1,0 +1,104 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.16
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 1447ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.1s (490 modules)
+ GET / 200 in 2259ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1006ms (730 modules)
+ ✓ Compiled /api/stt in 197ms (406 modules)
+Received audio file: recording.wav 121877 bytes type: audio/wav
+Cartesia STT result: {
+  type: 'transcript',
+  duration: 7.56,
+  language: 'en',
+  is_final: false,
+  request_id: '80cd93f7-cc30-4033-852f-aaa6b65c6668',
+  text: 'Hey, can you set up a meeting today at 9 AM?'
+}
+ POST /api/stt 200 in 836ms
+ ○ Compiling /api/tts ...
+ ✓ Compiled /api/tts in 985ms (821 modules)
+ POST /api/tts 200 in 3357ms
+ ✓ Compiled /_not-found in 274ms (1164 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 345ms
+Received audio file: recording.wav 131537 bytes type: audio/wav
+Cartesia STT result: {
+  type: 'transcript',
+  duration: 8.16,
+  language: 'en',
+  is_final: false,
+  request_id: '13431ea3-ae47-41ba-a735-309d32c1bac8',
+  text: 'Hey, can you set up a meeting today at 10am?'
+}
+ POST /api/stt 200 in 506ms
+ POST /api/tts 200 in 2157ms
+ ✓ Compiled in 473ms (726 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/home/pappu/MHacks2025/frontend/.next/cache/webpack/server-development/2.pack.gz_' -> '/home/pappu/MHacks2025/frontend/.next/cache/webpack/server-development/2.pack.gz'
+ ✓ Compiled / in 64ms (376 modules)
+ ✓ Compiled /_not-found in 243ms (719 modules)
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 908ms (945 modules)
+ GET / 404 in 1508ms
+ ✓ Compiled in 818ms (952 modules)
+ ✓ Compiled in 308ms (952 modules)
+ ✓ Compiled in 282ms (952 modules)
+ ✓ Compiled in 311ms (952 modules)
+ ✓ Compiled in 270ms (952 modules)
+ ✓ Compiled in 331ms (958 modules)
+ ✓ Compiled in 262ms (958 modules)
+ ✓ Compiled in 294ms (958 modules)
+ ✓ Compiled in 245ms (958 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/2.pack.gz_' -> '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/2.pack.gz'
+ ✓ Compiled in 643ms (958 modules)
+ ✓ Compiled in 391ms (958 modules)
+ ✓ Compiled in 292ms (958 modules)
+ ✓ Compiled in 272ms (952 modules)
+ ✓ Compiled in 212ms (539 modules)
+ ✓ Compiled in 251ms (539 modules)
+ ✓ Compiled in 270ms (952 modules)
+ ✓ Compiled in 598ms (956 modules)
+ ✓ Compiled in 352ms (956 modules)
+ ✓ Compiled in 289ms (956 modules)
+ ✓ Compiled in 291ms (956 modules)
+ ✓ Compiled in 293ms (958 modules)
+ ✓ Compiled in 346ms (958 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz_' -> '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 478ms (958 modules)
+ ✓ Compiled in 340ms (958 modules)
+ ✓ Compiled in 289ms (958 modules)
+ ✓ Compiled in 357ms (958 modules)
+ ✓ Compiled in 289ms (958 modules)
+ ✓ Compiled in 368ms (958 modules)
+ ✓ Compiled in 284ms (958 modules)
+ ✓ Compiled in 459ms (958 modules)
+ ✓ Compiled in 411ms (958 modules)
+ ✓ Compiled in 320ms (958 modules)
+ ✓ Compiled in 294ms (958 modules)
+ ✓ Compiled in 383ms (958 modules)
+ ✓ Compiled in 300ms (958 modules)
+ ✓ Compiled in 310ms (958 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz_' -> '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 463ms (958 modules)
+ ✓ Compiled in 333ms (958 modules)
+ ✓ Compiled in 200ms (542 modules)
+ ✓ Compiled in 361ms (958 modules)
+ ✓ Compiled in 264ms (958 modules)
+ ✓ Compiled in 270ms (958 modules)
+ ✓ Compiled in 389ms (958 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz_' -> '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 380ms (954 modules)
+ ✓ Compiled in 295ms (954 modules)
+ ✓ Compiled in 211ms (540 modules)
+ ✓ Compiled in 172ms (540 modules)
+ ✓ Compiled in 264ms (954 modules)
+ ✓ Compiled in 290ms (954 modules)
+ ✓ Compiled in 289ms (954 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz_' -> '/home/pappu/MHacks2025/frontend/.next/cache/webpack/client-development/0.pack.gz'
+[?25h

@@ -1,121 +1,127 @@
 class TTSService {
-  private audioContext: AudioContext | null = null;
+  private currentAudio: HTMLAudioElement | null = null;
 
-  private async initAudioContext() {
-    if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    
-    if (this.audioContext.state === 'suspended') {
-      await this.audioContext.resume();
-    }
+  constructor() {
+    // Cartesia-based TTS doesn't need browser speech synthesis
+    console.log('TTS: Initialized with Cartesia API');
   }
 
-  async textToSpeech(text: string): Promise<void> {
+  async speak(text: string, options: {
+    rate?: number;
+    pitch?: number;
+    volume?: number;
+    onEnd?: () => void;
+    onError?: (error: Error) => void;
+  } = {}): Promise<void> {
     if (!text.trim()) {
-      throw new Error("Text cannot be empty");
+      console.warn('TTS: Empty text provided');
+      return;
     }
 
-    try {
-      await this.initAudioContext();
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Stop any current speech
+        this.stop();
 
-      // Make API call to our backend TTS route
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
+        console.log('TTS: Speaking with Cartesia:', text);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
-      }
+        // Call our Cartesia TTS API
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text }),
+        });
 
-      // Get the audio data as ArrayBuffer
-      const audioBuffer = await response.arrayBuffer();
+        if (!response.ok) {
+          throw new Error(`TTS API error: ${response.status}`);
+        }
 
-      // Convert ArrayBuffer to audio and play
-      await this.playAudioBuffer(audioBuffer);
-    } catch (error) {
-      console.error("Text-to-speech error:", error);
-      throw new Error("Failed to convert text to speech");
-    }
-  }
+        // Get the audio blob
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
 
-  private async playAudioBuffer(audioBuffer: ArrayBuffer): Promise<void> {
-    if (!this.audioContext) {
-      throw new Error("Audio context not initialized");
-    }
+        // Create and play audio element
+        const audio = new Audio(audioUrl);
+        this.currentAudio = audio;
 
-    try {
-      // Decode the audio data
-      const decodedData = await this.audioContext.decodeAudioData(audioBuffer.slice(0));
-      
-      // Create audio source
-      const source = this.audioContext.createBufferSource();
-      source.buffer = decodedData;
-      source.connect(this.audioContext.destination);
-      
-      // Play the audio
-      source.start();
-
-      // Return a promise that resolves when audio finishes playing
-      return new Promise((resolve) => {
-        source.onended = () => resolve();
-      });
-    } catch (error) {
-      console.error("Error playing audio:", error);
-      throw new Error("Failed to play audio");
-    }
-  }
-
-  // Alternative method using HTML5 Audio API (more compatible but less control)
-  async textToSpeechSimple(text: string): Promise<void> {
-    if (!text.trim()) {
-      throw new Error("Text cannot be empty");
-    }
-
-    try {
-      // Make API call to our backend TTS route
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
-      }
-
-      // Create a blob from the response
-      const blob = await response.blob();
-      const audioUrl = URL.createObjectURL(blob);
-      
-      // Create and play audio element
-      const audio = new Audio(audioUrl);
-      
-      return new Promise((resolve, reject) => {
         audio.onended = () => {
+          console.log('TTS: Cartesia speech completed');
+          this.currentAudio = null;
           URL.revokeObjectURL(audioUrl);
+          options.onEnd?.();
           resolve();
         };
-        audio.onerror = () => {
+
+        audio.onerror = (event) => {
+          console.error('TTS: Cartesia audio error:', event);
+          this.currentAudio = null;
           URL.revokeObjectURL(audioUrl);
-          reject(new Error("Failed to play audio"));
+          const error = new Error('Cartesia audio playback error');
+          options.onError?.(error);
+          reject(error);
         };
-        
-        audio.play().catch(reject);
-      });
-    } catch (error) {
-      console.error("Text-to-speech error:", error);
-      throw new Error("Failed to convert text to speech");
+
+        audio.onloadstart = () => {
+          console.log('TTS: Cartesia speech started');
+        };
+
+        // Set volume if specified
+        if (options.volume !== undefined) {
+          audio.volume = Math.max(0, Math.min(1, options.volume));
+        } else {
+          audio.volume = 0.8; // Default volume
+        }
+
+        // Play the audio
+        await audio.play();
+      } catch (error) {
+        console.error('TTS: Cartesia error:', error);
+        const ttsError = error instanceof Error ? error : new Error('Unknown Cartesia TTS error');
+        options.onError?.(ttsError);
+        reject(ttsError);
+      }
+    });
+  }
+
+  stop() {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
+      this.currentAudio = null;
+      console.log('TTS: Cartesia speech stopped');
     }
+  }
+
+  isSpeaking(): boolean {
+    return this.currentAudio ? !this.currentAudio.paused : false;
+  }
+
+  pause() {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      console.log('TTS: Cartesia speech paused');
+    }
+  }
+
+  resume() {
+    if (this.currentAudio) {
+      this.currentAudio.play();
+      console.log('TTS: Cartesia speech resumed');
+    }
+  }
+
+  getAvailableVoices(): string[] {
+    // Cartesia voices - return available voice IDs
+    return ['sonic-2']; // Default Cartesia voice
+  }
+
+  setVoice(voiceId: string) {
+    // Voice selection would be handled in the API call
+    console.log('TTS: Voice preference set to:', voiceId);
   }
 }
 
-export const ttsService = new TTSService();
+// Only create TTS service in browser environment
+export const ttsService = typeof window !== 'undefined' ? new TTSService() : null;

@@ -13,6 +13,7 @@ export interface TimeSlot {
   day_of_week: string
   date_formatted: string
   time_formatted: string
+  explanation?: string
 }
 
 export interface NegotiationResult {
@@ -53,7 +54,7 @@ export interface CalendarBlock {
   created_at: string
 }
 
-const API_BASE_URL = "http://localhost:4000"
+const API_BASE_URL = "http://localhost:8000"
 
 class ApiService {
   private async fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -115,6 +116,30 @@ class ApiService {
     return this.fetchApi<NegotiationResult>(`/api/schedule?slot_index=${slotIndex}`, {
       method: "POST",
       body: JSON.stringify(request),
+    })
+  }
+
+  // Delete calendar block
+  async deleteCalendarBlock(blockId: string) {
+    return this.fetchApi<{
+      success: boolean
+      message: string
+      block_id: string
+      timestamp: string
+    }>(`/api/calendar-block/${blockId}`, {
+      method: "DELETE",
+    })
+  }
+
+  // Delete meeting
+  async deleteMeeting(meetingId: string) {
+    return this.fetchApi<{
+      success: boolean
+      message: string
+      meeting_id: string
+      timestamp: string
+    }>(`/api/meeting/${meetingId}`, {
+      method: "DELETE",
     })
   }
 }
