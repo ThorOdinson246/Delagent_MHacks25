@@ -23,7 +23,7 @@ class VoiceService {
   constructor() {
     this.baseUrl = process.env.NODE_ENV === 'production' 
       ? 'https://your-production-url.com' 
-      : 'http://localhost:8000';
+      : 'http://localhost:3001';
   }
 
   async processVoiceCommand(transcript: string, action: string = 'schedule'): Promise<VoiceServiceResponse> {

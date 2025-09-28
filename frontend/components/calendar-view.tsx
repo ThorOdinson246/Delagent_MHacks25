@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Users, Brain, Calendar, RefreshCw, X, Clock, User } from "lucide-react"
+import { ChevronLeft, ChevronRight, Users, Brain, Calendar, RefreshCw, X, Clock, User, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
 import { apiService, type CalendarBlock, type Meeting } from "@/lib/api"
 
@@ -38,6 +38,28 @@ export function CalendarView() {
       console.error("Error fetching calendar data:", err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const deleteCalendarBlock = async (blockId: string) => {
+    try {
+      await apiService.deleteCalendarBlock(blockId)
+      // Refresh calendar data after deletion
+      await fetchCalendarData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete calendar block")
+      console.error("Error deleting calendar block:", err)
+    }
+  }
+
+  const deleteMeeting = async (meetingId: string) => {
+    try {
+      await apiService.deleteMeeting(meetingId)
+      // Refresh calendar data after deletion
+      await fetchCalendarData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete meeting")
+      console.error("Error deleting meeting:", err)
     }
   }
 
@@ -357,6 +379,20 @@ export function CalendarView() {
                               <div className="text-sm text-black">
                                 <strong>Block Type:</strong> {block.block_type.replace('_', ' ').toUpperCase()}
                               </div>
+                              <div className="flex justify-end mt-3">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    deleteCalendarBlock(block.id)
+                                  }}
+                                  className="text-xs"
+                                >
+                                  <Trash2 className="w-3 h-3 mr-1" />
+                                  Delete
+                                </Button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -387,7 +423,17 @@ export function CalendarView() {
                     <div key={meeting.id || `meeting-${meeting.preferred_start_time}-${meeting.preferred_end_time}`} className="p-4 rounded-lg border border-border/50 bg-background/50 space-y-3">
                       <div className="flex items-start justify-between">
                         <h4 className="font-medium">{meeting.title}</h4>
-                        <Badge className={getStatusColor(meeting.status)}>{meeting.status}</Badge>
+                        <div className="flex items-center space-x-2">
+                          <Badge className={getStatusColor(meeting.status)}>{meeting.status}</Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => deleteMeeting(meeting.id)}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 p-1 h-6 w-6"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="space-y-2 text-sm">
@@ -527,6 +573,17 @@ export function CalendarView() {
                                       Flexible
                                     </Badge>
                                   )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      deleteCalendarBlock(block.id)
+                                      setSelectedDay(null) // Close modal after deletion
+                                    }}
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 p-1 h-6 w-6"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -560,9 +617,22 @@ export function CalendarView() {
                                     </p>
                                   )}
                                 </div>
-                                <Badge className={getStatusColor(meeting.status)}>
-                                  {meeting.status}
-                                </Badge>
+                                <div className="flex items-center space-x-2">
+                                  <Badge className={getStatusColor(meeting.status)}>
+                                    {meeting.status}
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      deleteMeeting(meeting.id)
+                                      setSelectedDay(null) // Close modal after deletion
+                                    }}
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 p-1 h-6 w-6"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           ))}

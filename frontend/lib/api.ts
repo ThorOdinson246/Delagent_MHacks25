@@ -118,6 +118,30 @@ class ApiService {
       body: JSON.stringify(request),
     })
   }
+
+  // Delete calendar block
+  async deleteCalendarBlock(blockId: string) {
+    return this.fetchApi<{
+      success: boolean
+      message: string
+      block_id: string
+      timestamp: string
+    }>(`/api/calendar-block/${blockId}`, {
+      method: "DELETE",
+    })
+  }
+
+  // Delete meeting
+  async deleteMeeting(meetingId: string) {
+    return this.fetchApi<{
+      success: boolean
+      message: string
+      meeting_id: string
+      timestamp: string
+    }>(`/api/meeting/${meetingId}`, {
+      method: "DELETE",
+    })
+  }
 }
 
 export const apiService = new ApiService()

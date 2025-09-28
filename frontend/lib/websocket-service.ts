@@ -56,6 +56,17 @@ class WebSocketService {
       console.log('Received scheduling update:', data);
       this.handleSchedulingUpdate(data);
     });
+
+    // Listen for generic messages (from Python backend)
+    this.socket.on('message', (data) => {
+      console.log('Received WebSocket message:', data);
+      try {
+        const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        this.handleNegotiationUpdate(parsedData);
+      } catch (e) {
+        console.log('Non-JSON WebSocket message:', data);
+      }
+    });
   }
 
   private attemptReconnect() {

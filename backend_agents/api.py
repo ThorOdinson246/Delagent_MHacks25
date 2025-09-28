@@ -20,6 +20,7 @@ import asyncio
 from typing import List, Dict, Any
 import google.generativeai as genai
 from dotenv import load_dotenv
+import socketio
 
 # Load environment variables
 load_dotenv()
@@ -451,6 +452,12 @@ class APINegotiation:
 # Initialize FastAPI app
 app = FastAPI(title="Agent Negotiation API", version="1.0.0")
 
+# Initialize Socket.IO server
+sio = socketio.AsyncServer(
+    cors_allowed_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    async_mode='asgi'
+)
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -484,6 +491,27 @@ class ConnectionManager:
                 self.active_connections.remove(connection)
 
 manager = ConnectionManager()
+
+# Socket.IO event handlers
+@sio.event
+async def connect(sid, environ):
+    print(f"Socket.IO client connected: {sid}")
+
+@sio.event
+async def disconnect(sid):
+    print(f"Socket.IO client disconnected: {sid}")
+
+@sio.event
+async def join_room(sid, data):
+    room = data.get('room', 'main') if isinstance(data, dict) else 'main'
+    sio.enter_room(sid, room)
+    print(f"Client {sid} joined room: {room}")
+
+@sio.event
+async def leave_room(sid, data):
+    room = data.get('room', 'main') if isinstance(data, dict) else 'main'
+    sio.leave_room(sid, room)
+    print(f"Client {sid} left room: {room}")
 
 # Global negotiation instance
 negotiation = APINegotiation()
@@ -585,6 +613,15 @@ async def negotiate_meeting(request: MeetingRequest):
             "timestamp": datetime.now().isoformat()
         }))
         
+        # Send agent reasoning messages
+        await manager.broadcast(json.dumps({
+            "type": "agent_reasoning",
+            "agent": "Pappu's Agent",
+            "message": f"🤔 Analyzing request for '{request.title}' on {request.preferred_date} at {request.preferred_time}",
+            "reasoning": "Checking my calendar and Alice's availability for optimal scheduling",
+            "timestamp": datetime.now().isoformat()
+        }))
+        
         # Validate input
         is_valid, error_message = negotiation.validate_input(request)
         if not is_valid:
@@ -598,14 +635,30 @@ async def negotiate_meeting(request: MeetingRequest):
         # Send agent communication message
         if request.is_ai_agent_meeting:
             await manager.broadcast(json.dumps({
-                "type": "agent_communication",
-                "message": "🤖 Pappu's Agent: Initiating meeting request with Alice's Agent",
+                "type": "agent_reasoning",
+                "agent": "Alice's Agent",
+                "message": "🤖 Alice's Agent responding to meeting request",
+                "reasoning": "Analyzing my focus blocks and existing commitments to find optimal times",
+                "timestamp": datetime.now().isoformat()
+            }))
+            
+            # Simulate negotiation delay
+            import asyncio
+            await asyncio.sleep(1)
+            
+            await manager.broadcast(json.dumps({
+                "type": "agent_reasoning",
+                "agent": "Pappu's Agent",
+                "message": "🔄 Negotiating with Alice's Agent",
+                "reasoning": "Comparing calendar conflicts and finding mutually beneficial time slots",
                 "timestamp": datetime.now().isoformat()
             }))
         else:
             await manager.broadcast(json.dumps({
-                "type": "agent_communication", 
-                "message": "👤 Pappu's Agent: Checking personal availability for external meeting",
+                "type": "agent_reasoning",
+                "agent": "Pappu's Agent", 
+                "message": "👤 Checking personal availability for external meeting",
+                "reasoning": "Scanning calendar for conflicts and optimal meeting windows",
                 "timestamp": datetime.now().isoformat()
             }))
         
@@ -656,6 +709,15 @@ async def negotiate_meeting(request: MeetingRequest):
             )
         
         formatted_slots = negotiation.format_slots_for_api(available_slots)
+        
+        # Send final reasoning before results
+        await manager.broadcast(json.dumps({
+            "type": "agent_reasoning",
+            "agent": "Alice's Agent",
+            "message": "✅ Agreement reached on optimal time slots",
+            "reasoning": f"Found {len(formatted_slots)} mutually acceptable meeting times that work for both schedules",
+            "timestamp": datetime.now().isoformat()
+        }))
         
         # Send success message with slot details
         await manager.broadcast(json.dumps({
@@ -834,16 +896,30 @@ async def api_voice_command(request: dict):
         # Process the meeting request
         result = await negotiate_meeting(meeting_request)
         
+        # Generate spoken response based on the negotiation result
+        if result.success and result.available_slots:
+            spoken_response = f"I found {len(result.available_slots)} available time slots for your meeting. The first available slot is on {result.available_slots[0].start_time.strftime('%A, %B %d at %I:%M %p')}. Would you like me to schedule this meeting?"
+        elif result.success and not result.available_slots:
+            spoken_response = "I couldn't find any available time slots for your meeting request. Please try a different date or time."
+        else:
+            spoken_response = "I had trouble processing your meeting request. Please try again or use the form below."
+        
         return {
             "success": True,
             "message": "Voice command processed successfully",
+            "spokenResponse": spoken_response,
             "meeting_request": meeting_request.dict(),
-            "negotiation_result": result
+            "negotiation_result": result.dict(),
+            "context": {
+                "originalRequest": request,
+                "negotiationResult": result.dict()
+            }
         }
     except Exception as e:
         return {
             "success": False,
-            "message": f"Error processing voice command: {str(e)}"
+            "message": f"Error processing voice command: {str(e)}",
+            "spokenResponse": "I encountered an error processing your request. Please try again."
         }
 
 @app.post("/api/stt")
@@ -864,5 +940,60 @@ async def api_speech_to_text(request: dict):
             "message": f"Error processing speech: {str(e)}"
         }
 
+@app.delete("/api/calendar-block/{block_id}")
+async def delete_calendar_block(block_id: str):
+    """Delete a calendar block"""
+    try:
+        # Delete from calendar_blocks table
+        result = await negotiation.db_manager.execute_command(
+            "DELETE FROM calendar_blocks WHERE id = ?", 
+            block_id
+        )
+        
+        if result:
+            return {
+                "success": True,
+                "message": "Calendar block deleted successfully",
+                "block_id": block_id,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Calendar block not found")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting calendar block: {str(e)}")
+
+@app.delete("/api/meeting/{meeting_id}")
+async def delete_meeting(meeting_id: str):
+    """Delete a meeting request"""
+    try:
+        # Delete from meeting_requests table
+        result = await negotiation.db_manager.execute_command(
+            "DELETE FROM meeting_requests WHERE id = ?", 
+            meeting_id
+        )
+        
+        if result:
+            # Also delete associated participants
+            await negotiation.db_manager.execute_command(
+                "DELETE FROM meeting_participants WHERE meeting_request_id = ?", 
+                meeting_id
+            )
+            
+            return {
+                "success": True,
+                "message": "Meeting deleted successfully",
+                "meeting_id": meeting_id,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting meeting: {str(e)}")
+
+# Mount Socket.IO app to FastAPI
+socket_app = socketio.ASGIApp(sio, app)
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(socket_app, host="0.0.0.0", port=8000)
