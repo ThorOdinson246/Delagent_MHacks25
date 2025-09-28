@@ -770,8 +770,8 @@ async def negotiate_meeting(request: MeetingRequest):
     try:
         # Send initial negotiation message
         if request.specific_agent:
-        await manager.broadcast(json.dumps({
-            "type": "negotiation_start",
+            await manager.broadcast(json.dumps({
+                "type": "negotiation_start",
                 "message": f"🤖 Checking {request.specific_agent.title()}'s calendar for '{request.title}'",
                 "timestamp": datetime.now().isoformat()
             }))

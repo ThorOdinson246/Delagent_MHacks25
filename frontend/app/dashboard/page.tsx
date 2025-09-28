@@ -43,19 +43,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <RealTimeNegotiation onMeetingScheduled={(meetingId) => {
-          console.log("Meeting scheduled:", meetingId)
-          // Refresh meeting dashboard
-        }} />
-
         <div className="grid lg:grid-cols-2 gap-6">
           {otherAgents.map(agent => (
             <RealTimeCalendar key={agent} userId={agent} isCollapsible={true} />
           ))}
         </div>
-
-        <MeetingDashboard />
-        <NegotiationView />
       </main>
     </div>
   )
