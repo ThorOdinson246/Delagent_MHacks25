@@ -16,7 +16,7 @@ A revolutionary **voice-first, autonomous AI scheduling platform** where intelli
 - ⚡ **Real-Time Updates** - WebSocket-powered live updates and visualizations
 - 🔄 **Conversational Flow** - Natural follow-up questions with context awareness
 - 🎯 **Business Hours Logic** - Automatic time suggestions within working hours
-- 📊 **Quality Scoring** - AI-driven meeting slot quality assessment
+- 📊 **Quality Scoring** - AI-driven meeting slot quality assessment   
 
 ---
 
