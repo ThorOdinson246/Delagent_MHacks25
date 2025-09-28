@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mic, MicOff, Send, Calendar, Brain } from "lucide-react"
+import { Mic, MicOff, Send, Calendar } from "lucide-react"
 import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/api"
 
 import { audioRecorderService } from "@/lib/audio-recorder-service"
@@ -13,13 +13,11 @@ import { voiceService } from "@/lib/voice-service"
 import { ttsService } from "@/lib/tts-service"
 import { websocketService } from "@/lib/websocket-service"
 import { EnhancedAudioVisualizer } from "./enhanced-audio-visualizer"
-import { AgentThinkingOverlay } from "./agent-thinking-overlay"
 
 // Speech Recognition types are handled by the DOM lib
 
 export function VoiceInterface() {
   const [isListening, setIsListening] = useState(false)
-  const [showThinkingOverlay, setShowThinkingOverlay] = useState(false)
   const [transcript, setTranscript] = useState("")
   const [meetingRequest, setMeetingRequest] = useState<MeetingRequest>({
     title: "",
@@ -103,8 +101,7 @@ export function VoiceInterface() {
       setLoading(true)
       setError(null)
       
-      // Show thinking overlay when processing starts
-      setShowThinkingOverlay(true)
+      // Agent thinking will be shown in the Agent Status component
       
       // Send to Gemini-powered orchestrator instead of local parsing
       console.log("Sending transcript to voice orchestrator:", transcript)
@@ -138,16 +135,11 @@ export function VoiceInterface() {
     } catch (err) {
       console.error("Voice orchestration failed:", err)
       setError(err instanceof Error ? err.message : "Voice command processing failed")
-      setShowThinkingOverlay(false)
       
       // Fallback to local parsing if orchestrator fails
       parseVoiceCommandFallback(transcript)
     } finally {
       setLoading(false)
-      // Keep overlay open for a bit to show final consensus
-      setTimeout(() => {
-        setShowThinkingOverlay(false)
-      }, 5000)
     }
   }
 
@@ -535,27 +527,8 @@ export function VoiceInterface() {
             )}
           </div>
         </div>
-
-        {/* Agent Thinking Button */}
-        <div className="pt-4 border-t border-border/50">
-          <Button
-            onClick={() => setShowThinkingOverlay(true)}
-            variant="outline"
-            size="sm"
-            className="w-full"
-          >
-            <Brain className="w-4 h-4 mr-2" />
-            Watch Agent Thinking Process
-          </Button>
-        </div>
       </CardContent>
     </Card>
-    
-    {/* Agent Thinking Overlay */}
-    <AgentThinkingOverlay 
-      isVisible={showThinkingOverlay}
-      onClose={() => setShowThinkingOverlay(false)}
-    />
     </>
   )
 }

@@ -42,9 +42,10 @@ export default function DashboardPage() {
           // Refresh meeting dashboard
         }} />
 
-        <div className="grid lg:grid-cols-2 gap-8">
+        <div className="grid lg:grid-cols-3 gap-6">
           <RealTimeCalendar userId="bob" />
           <RealTimeCalendar userId="alice" />
+          <RealTimeCalendar userId="charlie" />
         </div>
 
         <MeetingDashboard />

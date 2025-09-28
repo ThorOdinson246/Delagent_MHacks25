@@ -1,120 +1,125 @@
 class TTSService {
-  private synth: SpeechSynthesis | null = null;
-  private voices: SpeechSynthesisVoice[] = [];
-  private currentVoice: SpeechSynthesisVoice | null = null;
+  private currentAudio: HTMLAudioElement | null = null;
 
   constructor() {
-    // Only initialize in browser environment
-    if (typeof window !== 'undefined') {
-      this.synth = window.speechSynthesis;
-      this.loadVoices();
-      
-      // Load voices when they become available
-      if (this.synth.onvoiceschanged !== undefined) {
-        this.synth.onvoiceschanged = () => this.loadVoices();
-      }
-    }
+    // Cartesia-based TTS doesn't need browser speech synthesis
+    console.log('TTS: Initialized with Cartesia API');
   }
 
-  private loadVoices() {
-    if (!this.synth) return;
-    this.voices = this.synth.getVoices();
-    
-    // Prefer English voices, especially US English
-    const preferredVoices = this.voices.filter(voice => 
-      voice.lang.startsWith('en') && 
-      (voice.name.includes('US') || voice.name.includes('American') || voice.name.includes('Google'))
-    );
-    
-    if (preferredVoices.length > 0) {
-      this.currentVoice = preferredVoices[0];
-    } else if (this.voices.length > 0) {
-      this.currentVoice = this.voices[0];
-    }
-    
-    console.log('Available voices:', this.voices.map(v => `${v.name} (${v.lang})`));
-    console.log('Selected voice:', this.currentVoice?.name);
-  }
-
-  speak(text: string, options: {
+  async speak(text: string, options: {
     rate?: number;
     pitch?: number;
     volume?: number;
     onEnd?: () => void;
     onError?: (error: Error) => void;
-  } = {}) {
+  } = {}): Promise<void> {
     if (!text.trim()) {
       console.warn('TTS: Empty text provided');
       return;
     }
 
-    if (!this.synth) {
-      console.warn('TTS: Speech synthesis not available (server-side rendering)');
-      return;
-    }
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Stop any current speech
+        this.stop();
 
-    // Cancel any ongoing speech
-    this.synth.cancel();
+        console.log('TTS: Speaking with Cartesia:', text);
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Set voice
-    if (this.currentVoice) {
-      utterance.voice = this.currentVoice;
-    }
-    
-    // Set speech parameters
-    utterance.rate = options.rate || 0.9; // Slightly slower for better comprehension
-    utterance.pitch = options.pitch || 1.0;
-    utterance.volume = options.volume || 0.8;
-    
-    // Set event handlers
-    utterance.onend = () => {
-      console.log('TTS: Speech completed');
-      options.onEnd?.();
-    };
-    
-    utterance.onerror = (event) => {
-      console.error('TTS: Speech error:', event);
-      options.onError?.(new Error(`Speech synthesis error: ${event.error}`));
-    };
-    
-    utterance.onstart = () => {
-      console.log('TTS: Speech started');
-    };
-    
-    // Speak the text
-    console.log('TTS: Speaking:', text);
-    this.synth.speak(utterance);
+        // Call our Cartesia TTS API
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`TTS API error: ${response.status}`);
+        }
+
+        // Get the audio blob
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+
+        // Create and play audio element
+        const audio = new Audio(audioUrl);
+        this.currentAudio = audio;
+
+        audio.onended = () => {
+          console.log('TTS: Cartesia speech completed');
+          this.currentAudio = null;
+          URL.revokeObjectURL(audioUrl);
+          options.onEnd?.();
+          resolve();
+        };
+
+        audio.onerror = (event) => {
+          console.error('TTS: Cartesia audio error:', event);
+          this.currentAudio = null;
+          URL.revokeObjectURL(audioUrl);
+          const error = new Error('Cartesia audio playback error');
+          options.onError?.(error);
+          reject(error);
+        };
+
+        audio.onloadstart = () => {
+          console.log('TTS: Cartesia speech started');
+        };
+
+        // Set volume if specified
+        if (options.volume !== undefined) {
+          audio.volume = Math.max(0, Math.min(1, options.volume));
+        } else {
+          audio.volume = 0.8; // Default volume
+        }
+
+        // Play the audio
+        await audio.play();
+      } catch (error) {
+        console.error('TTS: Cartesia error:', error);
+        const ttsError = error instanceof Error ? error : new Error('Unknown Cartesia TTS error');
+        options.onError?.(ttsError);
+        reject(ttsError);
+      }
+    });
   }
 
   stop() {
-    if (!this.synth) return;
-    this.synth.cancel();
-    console.log('TTS: Speech stopped');
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
+      this.currentAudio = null;
+      console.log('TTS: Cartesia speech stopped');
+    }
   }
 
   isSpeaking(): boolean {
-    return this.synth ? this.synth.speaking : false;
+    return this.currentAudio ? !this.currentAudio.paused : false;
   }
 
   pause() {
-    if (!this.synth) return;
-    this.synth.pause();
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      console.log('TTS: Cartesia speech paused');
+    }
   }
 
   resume() {
-    if (!this.synth) return;
-    this.synth.resume();
+    if (this.currentAudio) {
+      this.currentAudio.play();
+      console.log('TTS: Cartesia speech resumed');
+    }
   }
 
-  getAvailableVoices(): SpeechSynthesisVoice[] {
-    return this.voices;
+  getAvailableVoices(): string[] {
+    // Cartesia voices - return available voice IDs
+    return ['sonic-2']; // Default Cartesia voice
   }
 
-  setVoice(voice: SpeechSynthesisVoice) {
-    this.currentVoice = voice;
-    console.log('TTS: Voice changed to:', voice.name);
+  setVoice(voiceId: string) {
+    // Voice selection would be handled in the API call
+    console.log('TTS: Voice preference set to:', voiceId);
   }
 }
 
