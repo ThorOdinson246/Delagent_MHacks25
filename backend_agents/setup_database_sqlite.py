@@ -12,7 +12,10 @@ import random
 import uuid
 
 # Database configuration
-DATABASE_PATH = "/home/pappu/MHacks2025/agentschedule.db"
+# Use relative path from the script location, or allow override via environment variable
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)  # Go up one level from backend_agents
+DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join(PROJECT_ROOT, "agentschedule.db"))
 
 # SQL schema adapted for SQLite
 SCHEMA_SQL = """

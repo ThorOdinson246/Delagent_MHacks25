@@ -15,7 +15,7 @@ class WebSocketService {
 
     console.log('Connecting to WebSocket server...');
     
-    this.socket = io('http://localhost:3001', {
+    this.socket = io('http://localhost:8000', {
       transports: ['websocket', 'polling'],
       timeout: 20000,
     });

@@ -13,8 +13,11 @@ class DatabaseManager:
     
     def __init__(self):
         self.connection = None
-        # Use SQLite database instead of PostgreSQL
-        self.database_path = "/home/pappu/MHacks2025/agentschedule.db"
+        # Use SQLite database with configurable path
+        # Default to project root, but allow override via environment variable
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(script_dir))  # Go up two levels from @agent2_alice
+        self.database_path = os.getenv("DATABASE_PATH", os.path.join(project_root, "agentschedule.db"))
     
     async def connect(self):
         """Connect to the database"""

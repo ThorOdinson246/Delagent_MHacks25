@@ -73,7 +73,10 @@ class APINegotiation:
         """Setup database connection"""
         try:
             # Import Alice's database service
-            sys.path.append('/home/pappu/MHacks2025/@agent2_alice')
+            # Use relative path from current script location
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            alice_agent_dir = os.path.join(script_dir, '@agent2_alice')
+            sys.path.append(alice_agent_dir)
             from database import calendar_service, db_manager, meeting_service
             
             self.db_manager = db_manager
@@ -774,6 +777,92 @@ async def schedule_meeting(request: MeetingRequest, slot_index: int = 0):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+# Add API prefix routes for frontend compatibility
+@app.get("/api/health")
+async def api_health_check():
+    """API health check endpoint"""
+    return await health_check()
+
+@app.get("/api/meetings")
+async def api_get_meetings():
+    """API endpoint to get all meetings"""
+    return await get_meetings()
+
+@app.get("/api/calendar/{user_id}")
+async def api_get_calendar(user_id: str):
+    """API endpoint to get user calendar"""
+    return await get_user_calendar(user_id)
+
+@app.post("/api/negotiate")
+async def api_negotiate(request: MeetingRequest):
+    """API endpoint to negotiate meeting"""
+    return await negotiate_meeting(request)
+
+@app.post("/api/schedule")
+async def api_schedule(request: MeetingRequest, slot_index: int = 0):
+    """API endpoint to schedule meeting"""
+    return await schedule_meeting(request, slot_index)
+
+@app.post("/api/voice-command")
+async def api_voice_command(request: dict):
+    """API endpoint for voice commands"""
+    try:
+        transcript = request.get("transcript", "")
+        action = request.get("action", "schedule")
+        
+        # Parse the voice command and create a meeting request
+        # This is a simple implementation - you might want to use AI/NLP here
+        
+        # Get next weekday (Monday-Friday)
+        today = datetime.now()
+        days_ahead = 1
+        while (today + timedelta(days=days_ahead)).weekday() > 4:  # 0=Monday, 6=Sunday
+            days_ahead += 1
+        next_weekday = today + timedelta(days=days_ahead)
+        
+        meeting_request = MeetingRequest(
+            title="Voice Meeting",
+            duration_minutes=60,
+            preferred_date=next_weekday.strftime("%Y-%m-%d"),
+            preferred_time="10:00",
+            participants=["bob", "alice"],
+            priority_level=5,
+            is_flexible=True
+        )
+        
+        # Process the meeting request
+        result = await negotiate_meeting(meeting_request)
+        
+        return {
+            "success": True,
+            "message": "Voice command processed successfully",
+            "meeting_request": meeting_request.dict(),
+            "negotiation_result": result
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error processing voice command: {str(e)}"
+        }
+
+@app.post("/api/stt")
+async def api_speech_to_text(request: dict):
+    """API endpoint for speech-to-text processing"""
+    try:
+        # This is a placeholder - you would implement actual STT here
+        # For now, return a mock response
+        return {
+            "success": True,
+            "transcript": "Mock transcript from voice input",
+            "duration": 5.0,
+            "language": "en"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error processing speech: {str(e)}"
+        }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
