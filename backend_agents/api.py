@@ -616,14 +616,14 @@ app = FastAPI(title="Agent Negotiation API", version="1.0.0")
 
 # Initialize Socket.IO server
 sio = socketio.AsyncServer(
-    cors_allowed_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://127.0.0.1:3002"],
+    cors_allowed_origins=["*"],
     async_mode='asgi'
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://127.0.0.1:3002"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -682,6 +682,7 @@ negotiation = APINegotiation()
 async def startup_event():
     """Initialize database connection on startup"""
     await negotiation.setup_database()
+    print("✅ Connected to SQLite database")
 
 @app.get("/")
 async def root():
@@ -803,6 +804,12 @@ async def negotiate_meeting(request: MeetingRequest):
         
         # Send detailed 3-agent communication messages with real calendar analysis
         if request.is_ai_agent_meeting:
+            await manager.broadcast(json.dumps({
+                "type": "negotiation_start", 
+                "message": "🤖 Starting 3-agent negotiation process...",
+                "timestamp": datetime.now().isoformat()
+            }))
+            
             # Get actual calendar data for realistic reasoning
             pappu_calendar = await negotiation.calendar_service.get_user_calendar_blocks("bob")
             alice_calendar = await negotiation.calendar_service.get_user_calendar_blocks("alice") 

@@ -1,0 +1,33 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Port 3001 is in use, trying 3002 instead.
+  ▲ Next.js 14.2.16
+  - Local:        http://localhost:3002
+
+ ✓ Starting...
+ ✓ Ready in 1443ms
+ ○ Compiling / ...
+ ✓ Compiled / in 2.1s (490 modules)
+ GET / 200 in 2282ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1027ms (730 modules)
+ ✓ Compiled /api/stt in 145ms (406 modules)
+Received audio file: recording.wav 113835 bytes type: audio/wav
+Cartesia STT result: {
+  type: 'transcript',
+  duration: 7.08,
+  language: 'en',
+  is_final: false,
+  request_id: '33121db7-4846-4c1d-baa3-2a0577e962a7',
+  text: "Hey, can you set up an appointment today at 10 o'clock?"
+}
+ POST /api/stt 200 in 891ms
+ ○ Compiling /api/tts ...
+ ✓ Compiled /api/tts in 937ms (821 modules)
+ POST /api/tts 200 in 3038ms
+ ✓ Compiled /_not-found in 142ms (1164 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 205ms
+ ✓ Compiled in 448ms (726 modules)
