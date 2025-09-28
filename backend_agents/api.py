@@ -536,14 +536,14 @@ app = FastAPI(title="Agent Negotiation API", version="1.0.0")
 
 # Initialize Socket.IO server
 sio = socketio.AsyncServer(
-    cors_allowed_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    cors_allowed_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://127.0.0.1:3002"],
     async_mode='asgi'
 )
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://127.0.0.1:3000", "http://127.0.0.1:3001", "http://127.0.0.1:3002"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

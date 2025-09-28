@@ -22,15 +22,20 @@ export function CalendarView() {
       setLoading(true)
       setError(null)
 
-      // Fetch calendar blocks for both users
-      const [bobCalendar, aliceCalendar, meetingsData] = await Promise.all([
+      // Fetch calendar blocks for all three users
+      const [bobCalendar, aliceCalendar, charlieCalendar, meetingsData] = await Promise.all([
         apiService.getUserCalendar("bob"),
         apiService.getUserCalendar("alice"),
+        apiService.getUserCalendar("charlie").catch(() => []), // Fallback to empty array if Charlie's calendar fails
         apiService.getMeetings(),
       ])
 
-      // Combine calendar blocks from both users
-      const allBlocks = [...bobCalendar.calendar_blocks, ...aliceCalendar.calendar_blocks]
+      // Combine calendar blocks from all users
+      const allBlocks = [
+        ...bobCalendar.calendar_blocks, 
+        ...aliceCalendar.calendar_blocks,
+        ...(charlieCalendar.calendar_blocks || [])
+      ]
       setCalendarBlocks(allBlocks)
       setMeetings(meetingsData.meetings)
     } catch (err) {
