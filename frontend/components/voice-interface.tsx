@@ -398,7 +398,7 @@ export function VoiceInterface() {
 
   return (
     <>
-    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+    <Card className="h-[800px] flex flex-col bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Mic className="w-5 h-5 text-primary" />
@@ -431,7 +431,7 @@ export function VoiceInterface() {
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="flex-1 overflow-y-auto space-y-6">
         {/* Voice Visualization */}
         <div className="relative h-64 rounded-lg flex items-center justify-center overflow-hidden">
           <EnhancedAudioVisualizer 

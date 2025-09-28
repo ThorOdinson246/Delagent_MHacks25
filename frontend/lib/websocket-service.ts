@@ -19,6 +19,12 @@ class WebSocketService {
       return;
     }
 
+    // Prevent multiple connection attempts
+    if (this.socket && !this.socket.disconnected) {
+      console.log('WebSocket connection already in progress');
+      return;
+    }
+
     console.log('Connecting to WebSocket server...');
     
     this.socket = io('http://localhost:3001', {

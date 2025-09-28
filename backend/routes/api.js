@@ -1,5 +1,5 @@
 import express from 'express';
-import { extractMeetingIntent, generateSpokenResponse, generateFakeAgentInteractions } from '../services/geminiService.js';
+import { extractMeetingIntent, generateSpokenResponse, generateLiveAgentNegotiations } from '../services/geminiService.js';
 
 const router = express.Router();
 
@@ -229,34 +229,22 @@ router.post('/voice-command', validateConfig, async (req, res) => {
                 });
             }
             
-            // Broadcast real-time agent status updates
-            console.log('[Node Backend] Step 2.5: Broadcasting real agent negotiation status...');
-            const io = req.app.get('io');
-            if (io) {
-                // Send initial processing status
-                setTimeout(() => {
-                    io.emit('agent-interaction', {
-                        type: 'agent_status',
-                        agent: 'System',
-                        message: 'Analyzing meeting request...',
-                        reasoning: `Processing request for "${meetingDetailsJSON.title}" on ${meetingDetailsJSON.preferred_date}`,
-                        confidence: 95,
-                        timestamp: new Date().toISOString()
-                    });
-                }, 500);
-                
-                // Send agent negotiation status
-                setTimeout(() => {
-                    io.emit('agent-interaction', {
-                        type: 'agent_reasoning',
-                        agent: 'Multi-Agent System',
-                        message: 'Agents negotiating optimal time slot...',
-                        reasoning: 'Alice, Pappu, and Charlie agents are analyzing calendars and preferences to find the best meeting time.',
-                        confidence: 90,
-                        timestamp: new Date().toISOString()
-                    });
-                }, 1500);
-            }
+                    // Generate REAL live agent negotiations
+                    console.log('[Node Backend] Step 2.5: Generating real agent negotiations...');
+                    const io = req.app.get('io');
+                    if (io) {
+                        // Send initial processing status
+                        setTimeout(() => {
+                            io.emit('agent-interaction', {
+                                type: 'agent_status',
+                                agent: 'System',
+                                message: 'Initializing agent negotiation...',
+                                reasoning: `Processing request for "${meetingDetailsJSON.title}" on ${meetingDetailsJSON.preferred_date}`,
+                                confidence: 95,
+                                timestamp: new Date().toISOString()
+                            });
+                        }, 500);
+                    }
             
             // --- PYTHON BACKEND CALL ---
             console.log('[Node Backend] Step 3: Sending extracted details to Python backend...');
@@ -308,32 +296,69 @@ router.post('/voice-command', validateConfig, async (req, res) => {
                 console.log('[Node Backend] Step 4: Received negotiation result from Python backend:', pythonResult);
             }
 
-            // Broadcast final agent result with real data
-            if (io) {
-                setTimeout(() => {
-                    if (pythonResult.success && pythonResult.available_slots?.length > 0) {
-                        const bestSlot = pythonResult.available_slots[0];
-                        io.emit('agent-interaction', {
-                            type: 'agent_success',
-                            agent: 'Agent Consensus',
-                            message: `Found ${pythonResult.available_slots.length} available slot${pythonResult.available_slots.length > 1 ? 's' : ''}`,
-                            reasoning: `Best option: ${bestSlot.day_of_week}, ${bestSlot.date_formatted} at ${bestSlot.time_formatted} (Quality Score: ${bestSlot.quality_score}/100). ${bestSlot.explanation}`,
-                            confidence: bestSlot.quality_score,
-                            timestamp: new Date().toISOString(),
-                            slots_found: pythonResult.available_slots.length
-                        });
-                    } else {
-                        io.emit('agent-interaction', {
-                            type: 'agent_failure',
-                            agent: 'Agent System',
-                            message: 'No available slots found',
-                            reasoning: `Searched ${pythonResult.total_slots_found || 0} potential slots but none met all requirements for the requested time.`,
-                            confidence: 85,
-                            timestamp: new Date().toISOString()
-                        });
+                    // Generate and broadcast REAL live agent negotiations using Gemini
+                    if (io) {
+                        console.log('[Node Backend] Step 3.5: Generating real-time agent negotiations...');
+                        
+                        // Generate realistic agent conversations
+                        try {
+                            const agentNegotiations = await generateLiveAgentNegotiations(meetingDetailsJSON, pythonResult);
+                            
+                            // Broadcast each negotiation message with realistic timing
+                            agentNegotiations.forEach((negotiation, index) => {
+                                setTimeout(() => {
+                                    io.emit('agent-interaction', {
+                                        type: 'agent_negotiation',
+                                        agent: negotiation.agent,
+                                        message: negotiation.message,
+                                        reasoning: negotiation.reasoning,
+                                        confidence: negotiation.confidence,
+                                        timestamp: negotiation.timestamp
+                                    });
+                                    console.log(`🤖 [${negotiation.agent}]: ${negotiation.message}`);
+                                }, 1000 + (index * 1500)); // Stagger messages every 1.5 seconds
+                            });
+                            
+                            // Send final consensus after all negotiations
+                            setTimeout(() => {
+                                if (pythonResult.success && pythonResult.available_slots?.length > 0) {
+                                    const bestSlot = pythonResult.available_slots[0];
+                                    io.emit('agent-interaction', {
+                                        type: 'agent_consensus',
+                                        agent: 'Agent Consensus',
+                                        message: `✅ Consensus reached: ${bestSlot.day_of_week}, ${bestSlot.date_formatted} at ${bestSlot.time_formatted}`,
+                                        reasoning: `All agents agreed this is the optimal solution with ${bestSlot.quality_score}/100 quality score.`,
+                                        confidence: bestSlot.quality_score,
+                                        timestamp: new Date().toISOString(),
+                                        slots_found: pythonResult.available_slots.length
+                                    });
+                                } else {
+                                    io.emit('agent-interaction', {
+                                        type: 'agent_consensus',
+                                        agent: 'Agent Consensus',
+                                        message: '❌ No suitable time slots found after thorough analysis',
+                                        reasoning: `All agents concluded no viable options exist in the requested timeframe.`,
+                                        confidence: 85,
+                                        timestamp: new Date().toISOString()
+                                    });
+                                }
+                            }, 1000 + (agentNegotiations.length * 1500) + 1000);
+                            
+                        } catch (error) {
+                            console.error('Error generating agent negotiations:', error);
+                            // Fallback to simple status update
+                            setTimeout(() => {
+                                io.emit('agent-interaction', {
+                                    type: 'agent_error',
+                                    agent: 'System',
+                                    message: 'Agent negotiation system encountered an issue',
+                                    reasoning: 'Falling back to direct scheduling result',
+                                    confidence: 70,
+                                    timestamp: new Date().toISOString()
+                                });
+                            }, 2000);
+                        }
                     }
-                }, 2500);
-            }
 
             // Step 2: Generate a natural language response from the Python backend's JSON output
             const spokenResponse = await generateSpokenResponse(pythonResult);

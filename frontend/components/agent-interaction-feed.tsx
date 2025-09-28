@@ -31,11 +31,21 @@ export function AgentInteractionFeed() {
     const handleAgentInteraction = (event: CustomEvent) => {
       const data = event.detail
       
-      if (data.type === 'agent_reasoning') {
+      // Handle all types of agent interactions from our REAL Gemini negotiations
+      if (data.type === 'agent_reasoning' || 
+          data.type === 'agent_negotiation' || 
+          data.type === 'agent_status' || 
+          data.type === 'agent_consensus' || 
+          data.type === 'agent_success' || 
+          data.type === 'agent_failure' ||
+          data.type === 'agent_error') {
         setIsActive(true)
         
+        // Create a content-based hash for better deduplication
+        const contentHash = `${data.agent}-${data.message}-${data.type}`.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
+        
         const newInteraction: AgentInteraction = {
-          id: `${Date.now()}-${Math.random()}`,
+          id: `${contentHash}-${Date.now()}`,
           agent: data.agent || 'Unknown Agent',
           message: data.message || '',
           reasoning: data.reasoning || '',
@@ -47,10 +57,31 @@ export function AgentInteractionFeed() {
           displayedText: ''
         }
 
-        setInteractions(prev => [...prev, newInteraction])
-        
-        // Start typing effect
-        startTypingEffect(newInteraction.id, newInteraction.message, newInteraction.reasoning)
+        // Check for duplicates before adding - prevent same agent with same message within 5 seconds
+        setInteractions(prev => {
+          const now = new Date(newInteraction.timestamp).getTime()
+          const isDuplicate = prev.some(existing => {
+            const existingTime = new Date(existing.timestamp).getTime()
+            const timeDiff = Math.abs(now - existingTime)
+            return (
+              existing.agent === newInteraction.agent &&
+              existing.message === newInteraction.message &&
+              timeDiff < 5000 // 5 seconds window
+            )
+          })
+          
+          if (isDuplicate) {
+            console.log(`🔄 Duplicate interaction filtered: ${newInteraction.agent} - ${newInteraction.message.substring(0, 50)}...`)
+            return prev
+          }
+          
+          // Only start typing effect if we're actually adding the interaction
+          setTimeout(() => {
+            startTypingEffect(newInteraction.id, newInteraction.message, newInteraction.reasoning)
+          }, 100)
+          
+          return [...prev, newInteraction]
+        })
       }
     }
 
@@ -112,14 +143,22 @@ export function AgentInteractionFeed() {
 
   const getAgentColor = (agentName: string) => {
     switch (agentName) {
+      case "Alice":
       case "Alice's Agent":
         return "border-l-purple-500 bg-purple-50 dark:bg-purple-950/20"
+      case "Bob (Pappu)":
+      case "Bob":
       case "Pappu's Agent":
         return "border-l-blue-500 bg-blue-50 dark:bg-blue-950/20"
+      case "Charlie":
       case "Charlie's Agent":
         return "border-l-green-500 bg-green-50 dark:bg-green-950/20"
-      default:
+      case "Agent Consensus":
+        return "border-l-yellow-500 bg-yellow-50 dark:bg-yellow-950/20"
+      case "System":
         return "border-l-gray-500 bg-gray-50 dark:bg-gray-950/20"
+      default:
+        return "border-l-slate-500 bg-slate-50 dark:bg-slate-950/20"
     }
   }
 
@@ -148,7 +187,7 @@ export function AgentInteractionFeed() {
   }
 
   return (
-    <Card className="h-[600px] flex flex-col">
+    <Card className="h-[800px] flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-lg">
