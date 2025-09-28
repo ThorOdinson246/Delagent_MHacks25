@@ -311,6 +311,7 @@ export function VoiceInterface() {
 
 
   return (
+    <>
     <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -555,5 +556,6 @@ export function VoiceInterface() {
       isVisible={showThinkingOverlay}
       onClose={() => setShowThinkingOverlay(false)}
     />
+    </>
   )
 }
