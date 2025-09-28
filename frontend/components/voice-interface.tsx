@@ -32,6 +32,8 @@ export function VoiceInterface() {
   const [isRecording, setIsRecording] = useState(false)
   const [silenceCountdown, setSilenceCountdown] = useState(0)
   const [audioLevels, setAudioLevels] = useState<number[]>([])
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingStage, setProcessingStage] = useState<string>("")
 
   const recognition = useRef<any | null>(null)
 
@@ -98,43 +100,63 @@ export function VoiceInterface() {
 
   const handleVoiceOrchestration = async (transcript: string) => {
     try {
+      setIsProcessing(true)
       setLoading(true)
       setError(null)
       
-      // Agent thinking will be shown in the Agent Status component
-      
-      // Send to Gemini-powered orchestrator instead of local parsing
+      setProcessingStage("🎯 Processing voice command...")
       console.log("Sending transcript to voice orchestrator:", transcript)
+      
+      // Add a small delay to show the processing stage
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      setProcessingStage("🤖 AI agents negotiating...")
       const result = await voiceService.processVoiceCommand(transcript, "schedule")
       
       console.log("Voice orchestrator response:", result)
       
-      // Update meeting request from Gemini's structured output
       if (result.context?.originalRequest) {
         setMeetingRequest(result.context.originalRequest)
       }
       
-      // Set negotiation result for UI display
       if (result.context?.negotiationResult) {
         setNegotiationResult(result.context.negotiationResult)
       }
+      
+      setProcessingStage("🗣️ Generating response...")
       
       // Speak the AI-generated response
       if (result.voice_response) {
         console.log("AI response:", result.voice_response)
         if (ttsService) {
+          setProcessingStage("🎵 Speaking response...")
           ttsService.speak(result.voice_response, {
-            onEnd: () => console.log("TTS completed"),
-            onError: (error) => console.error("TTS error:", error)
+            onEnd: () => {
+              console.log("TTS completed")
+              setProcessingStage("")
+              setIsProcessing(false)
+            },
+            onError: (error) => {
+              console.error("TTS error:", error)
+              setProcessingStage("")
+              setIsProcessing(false)
+            }
           })
         } else {
           console.log("TTS not available (server-side rendering)")
+          setProcessingStage("")
+          setIsProcessing(false)
         }
+      } else {
+        setProcessingStage("")
+        setIsProcessing(false)
       }
       
     } catch (err) {
       console.error("Voice orchestration failed:", err)
       setError(err instanceof Error ? err.message : "Voice command processing failed")
+      setProcessingStage("")
+      setIsProcessing(false)
       
       // Fallback to local parsing if orchestrator fails
       parseVoiceCommandFallback(transcript)
@@ -183,32 +205,39 @@ export function VoiceInterface() {
     if (!isRecording) return
     
     try {
-      setIsListening(true) // Show processing state
+      setIsListening(true)
       setError(null)
+      setProcessingStage("🎤 Processing audio...")
       console.log("Stopping recording...")
       
       const audioBlob = await audioRecorderService.stopRecording()
       console.log("Audio recorded, sending for transcription...")
       
+      setProcessingStage("📝 Transcribing speech...")
       const transcribedText = await audioRecorderService.sendAudioToSTT(audioBlob)
       console.log("Transcription received:", transcribedText)
+      
+      setIsRecording(false)
+      setIsListening(false)
+      setSilenceCountdown(0)
       
       if (transcribedText.trim()) {
         setTranscript(transcribedText)
         await handleVoiceOrchestration(transcribedText)
       } else {
         setError("No speech detected. Please try speaking louder or closer to the microphone.")
+        setProcessingStage("")
+        setIsProcessing(false)
       }
       
-      setIsRecording(false)
-      setIsListening(false)
-      setSilenceCountdown(0)
     } catch (err) {
       console.error("Failed to process recording:", err)
       setError(err instanceof Error ? err.message : "Failed to process recording")
       setIsRecording(false)
       setIsListening(false)
       setSilenceCountdown(0)
+      setProcessingStage("")
+      setIsProcessing(false)
     }
   }
 
@@ -316,7 +345,7 @@ export function VoiceInterface() {
         <div className="relative h-64 rounded-lg flex items-center justify-center overflow-hidden">
           <EnhancedAudioVisualizer 
             isRecording={isRecording} 
-            isProcessing={isListening} 
+            isProcessing={isListening || isProcessing} 
             audioLevels={audioLevels}
             width={280}
             height={280}
@@ -330,28 +359,28 @@ export function VoiceInterface() {
         </div>
 
         {/* Controls */}
-        <div className="flex justify-center gap-4">
+        <div className="flex flex-col items-center gap-3">
           <Button
             size="lg"
             onClick={toggleListening}
-            disabled={isListening}
+            disabled={isListening || isProcessing}
             className={
               isRecording
                 ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                : isListening 
-                ? "bg-yellow-500 hover:bg-yellow-600"
+                : isListening || isProcessing
+                ? "bg-yellow-500 hover:bg-yellow-600 cursor-not-allowed"
                 : "bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90"
             }
           >
             {isRecording ? (
               <>
                 <MicOff className="w-5 h-5 mr-2" />
-                Stop Recording
+                Recording... (Auto-stops)
               </>
-            ) : isListening ? (
+            ) : isListening || isProcessing ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Processing...
+                {processingStage || "Processing..."}
               </>
             ) : (
               <>
@@ -361,7 +390,13 @@ export function VoiceInterface() {
             )}
           </Button>
 
-
+          {/* Processing Status */}
+          {(isListening || isProcessing) && processingStage && (
+            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
+              <div className="animate-pulse w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+              {processingStage}
+            </div>
+          )}
         </div>
 
         {/* Transcript */}
@@ -512,13 +547,13 @@ export function VoiceInterface() {
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${
               isRecording ? "bg-red-500 animate-pulse" : 
-              isListening ? "bg-yellow-500 animate-pulse" : 
-              "bg-muted-foreground"
+              isListening || isProcessing ? "bg-yellow-500 animate-pulse" : 
+              "bg-green-500"
             }`} />
             <span className="text-muted-foreground">
-              {isRecording ? "Recording..." : 
-               isListening ? "Processing..." : 
-               "Ready to record"}
+              {isRecording ? "Recording... (Auto-stops after 3s silence)" : 
+               isListening || isProcessing ? (processingStage || "Processing...") : 
+               "Ready - Just start speaking!"}
             </span>
             {silenceCountdown > 0 && (
               <span className="text-xs text-orange-500 ml-2">

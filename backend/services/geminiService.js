@@ -212,3 +212,180 @@ export async function generateSpokenResponse(negotiationResult) {
     }
 }
 
+/**
+ * Generate fake agent interactions based on user input to show impressive AI negotiation
+ * @param {string} transcript - The user's voice command
+ * @param {object} meetingRequest - The extracted meeting request
+ * @returns {Promise<Array>} - Array of fake agent interaction messages
+ */
+export async function generateFakeAgentInteractions(transcript, meetingRequest) {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" });
+
+    const prompt = `
+        You are generating realistic AI agent conversations for a scheduling platform demo. 
+        Create an impressive sequence of agent interactions that shows sophisticated AI negotiation.
+        
+        Context:
+        - User said: "${transcript}"
+        - Meeting request: ${JSON.stringify(meetingRequest)}
+        - We have 3 AI agents: Alice (Focus-Protective), Pappu (Collaborative), Charlie (Strategic)
+        
+        Generate 8-12 realistic agent interaction messages that show:
+        1. Initial analysis and reasoning
+        2. Calendar conflict detection  
+        3. Agent disagreements and negotiations
+        4. Strategic compromises
+        5. Final consensus
+        
+        Each message should have this format:
+        {
+            "type": "agent_reasoning",
+            "agent": "Alice's Agent" | "Pappu's Agent" | "Charlie's Agent",
+            "message": "Brief status message",
+            "reasoning": "Detailed reasoning (2-3 sentences)",
+            "confidence": 75-95,
+            "timestamp": "current_iso_time",
+            "conflictsWith": ["other agent names if disagreeing"],
+            "agreessWith": ["other agent names if agreeing"]
+        }
+        
+        Make it feel like real AI agents with:
+        - Specific calendar analysis
+        - Personality-driven responses (Alice protects focus time, Pappu collaborates, Charlie optimizes)
+        - Realistic conflicts and resolutions
+        - Technical but understandable language
+        - Progressive negotiation that reaches consensus
+        
+        Return ONLY a JSON array of these messages. No other text.
+    `;
+
+    try {
+        if (GEMINI_API_KEY === "mock_key_for_development") {
+            // Return impressive mock interactions
+            const timestamp = new Date().toISOString();
+            // Create more dynamic interactions based on the actual request
+            const meetingTitle = meetingRequest.title || "meeting";
+            const requestedTime = meetingRequest.preferred_time || "requested time";
+            const requestedDate = meetingRequest.preferred_date || "requested date";
+            
+            return [
+                {
+                    "type": "agent_reasoning",
+                    "agent": "Alice's Agent",
+                    "message": "🎯 Deep calendar analysis initiated",
+                    "reasoning": `Processing request for "${meetingTitle}" on ${requestedDate}. Scanning 47 calendar blocks for conflicts with my focus time architecture. My productivity algorithms show 3 critical deep work sessions that require protection.`,
+                    "confidence": 96,
+                    "timestamp": timestamp,
+                    "conflictsWith": [],
+                    "agreessWith": []
+                },
+                {
+                    "type": "agent_reasoning", 
+                    "agent": "Charlie's Agent",
+                    "message": "📊 Multi-dimensional efficiency matrix running",
+                    "reasoning": `Strategic analysis of "${meetingTitle}" request. Cross-referencing team availability patterns, productivity curves, and operational efficiency metrics. Preliminary scan shows 73% team coordination potential for this time window.`,
+                    "confidence": 91,
+                    "timestamp": timestamp,
+                    "conflictsWith": [],
+                    "agreessWith": []
+                },
+                {
+                    "type": "agent_reasoning",
+                    "agent": "Pappu's Agent", 
+                    "message": "🤝 Collaborative mediation protocol active",
+                    "reasoning": `Initiating team harmony optimization for "${meetingTitle}". My flexibility algorithms can accommodate 6 different scheduling scenarios. Prioritizing Alice's focus protection while leveraging Charlie's efficiency insights.`,
+                    "confidence": 87,
+                    "timestamp": timestamp,
+                    "conflictsWith": [],
+                    "agreessWith": []
+                },
+                {
+                    "type": "agent_reasoning",
+                    "agent": "Alice's Agent",
+                    "message": "⚠️ Critical conflict vector detected",
+                    "reasoning": `Alert: The ${requestedTime} slot creates a 67% overlap with my core productivity window. This fragmentation would cascade through my entire focus architecture, potentially reducing deep work efficiency by 43%. Requesting alternative time matrices.`,
+                    "confidence": 98,
+                    "timestamp": timestamp,
+                    "conflictsWith": ["Charlie's Agent"],
+                    "agreessWith": []
+                },
+                {
+                    "type": "agent_reasoning",
+                    "agent": "Charlie's Agent",
+                    "message": "⚡ Dynamic recalibration in progress", 
+                    "reasoning": `Acknowledged Alice's focus protection requirements. Executing advanced scheduling algorithms with enhanced constraints. New analysis reveals 4 high-efficiency windows with 89% team satisfaction probability. Optimizing for maximum collective productivity.`,
+                    "confidence": 93,
+                    "timestamp": timestamp,
+                    "conflictsWith": [],
+                    "agreessWith": ["Alice's Agent"]
+                },
+                {
+                    "type": "agent_reasoning",
+                    "agent": "Pappu's Agent",
+                    "message": "✅ Consensus convergence achieved",
+                    "reasoning": `Breakthrough! Found the perfect solution for "${meetingTitle}". Wednesday 2:30PM creates a 94% satisfaction matrix - Alice's focus boundaries respected, Charlie's efficiency metrics optimized, and my collaborative flexibility maximized. Team synergy activated!`,
+                    "confidence": 95,
+                    "timestamp": timestamp,
+                    "conflictsWith": [],
+                    "agreessWith": ["Alice's Agent", "Charlie's Agent"]
+                },
+                {
+                    "type": "agent_reasoning",
+                    "agent": "Alice's Agent",
+                    "message": "🎯 Solution validation complete",
+                    "reasoning": `Confirmed: Wednesday 2:30PM maintains my focus time integrity while enabling productive collaboration. This time slot preserves my morning deep work sessions and afternoon creative periods. Productivity impact: minimal. Approving this optimal solution.`,
+                    "confidence": 97,
+                    "timestamp": timestamp,
+                    "conflictsWith": [],
+                    "agreessWith": ["Pappu's Agent", "Charlie's Agent"]
+                },
+                {
+                    "type": "agent_reasoning",
+                    "agent": "Charlie's Agent",
+                    "message": "📈 Final efficiency optimization locked",
+                    "reasoning": `Strategic confirmation: Wednesday 2:30PM achieves 96% team efficiency rating. All productivity metrics aligned, resource allocation optimized, and collaborative potential maximized. This represents peak operational excellence for the "${meetingTitle}" objective.`,
+                    "confidence": 94,
+                    "timestamp": timestamp,
+                    "conflictsWith": [],
+                    "agreessWith": ["Alice's Agent", "Pappu's Agent"]
+                }
+            ];
+        }
+
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
+        
+        // Parse the JSON response
+        const interactions = JSON.parse(text.trim());
+        return interactions;
+
+    } catch (error) {
+        console.error("Error generating fake agent interactions:", error);
+        // Fallback to basic mock interactions
+        const timestamp = new Date().toISOString();
+        return [
+            {
+                "type": "agent_reasoning",
+                "agent": "Alice's Agent",
+                "message": "🤖 Analyzing calendar conflicts",
+                "reasoning": "Processing your meeting request and checking for conflicts with my focus time blocks.",
+                "confidence": 85,
+                "timestamp": timestamp,
+                "conflictsWith": [],
+                "agreessWith": []
+            },
+            {
+                "type": "agent_reasoning",
+                "agent": "Pappu's Agent",
+                "message": "🤝 Coordinating schedules",
+                "reasoning": "Working with Alice and Charlie to find the optimal meeting time for everyone.",
+                "confidence": 88,
+                "timestamp": timestamp,
+                "conflictsWith": [],
+                "agreessWith": ["Alice's Agent"]
+            }
+        ];
+    }
+}
+

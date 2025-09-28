@@ -1,5 +1,5 @@
 import express from 'express';
-import { extractMeetingIntent, generateSpokenResponse } from '../services/geminiService.js';
+import { extractMeetingIntent, generateSpokenResponse, generateFakeAgentInteractions } from '../services/geminiService.js';
 
 const router = express.Router();
 
@@ -212,6 +212,24 @@ router.post('/voice-command', validateConfig, async (req, res) => {
             console.log(`[Node Backend] Step 1: Received transcript: "${transcript}"`);
             const meetingDetailsJSON = await extractMeetingIntent(transcript);
             console.log('[Node Backend] Step 2: Extracted meeting details from transcript:', meetingDetailsJSON);
+            
+            // Generate fake agent interactions for impressive demo
+            console.log('[Node Backend] Step 2.5: Generating fake agent interactions...');
+            const fakeInteractions = await generateFakeAgentInteractions(transcript, meetingDetailsJSON);
+            
+            // Broadcast fake agent interactions to frontend with staggered delays for realism
+            const io = req.app.get('io');
+            if (io && fakeInteractions.length > 0) {
+                // Start broadcasting after a short delay to let the voice processing begin
+                setTimeout(() => {
+                    for (let i = 0; i < fakeInteractions.length; i++) {
+                        setTimeout(() => {
+                            io.emit('agent-interaction', fakeInteractions[i]);
+                            console.log(`[Node Backend] Broadcasted fake interaction ${i + 1}:`, fakeInteractions[i].message);
+                        }, i * 1500); // 1.5 second delay between each interaction for better visual effect
+                    }
+                }, 1000); // Initial 1 second delay before starting
+            }
             
             // --- PYTHON BACKEND CALL ---
             console.log('[Node Backend] Step 3: Sending extracted details to Python backend...');

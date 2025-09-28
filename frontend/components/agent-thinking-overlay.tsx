@@ -77,8 +77,8 @@ export function AgentThinkingOverlay({ isVisible, onClose }: AgentThinkingOverla
     
     // Use backend-provided confidence or calculate from message content
     let confidence = data.confidence || 85
-    let conflictsWith: string[] = data.conflicts_with || []
-    let agreessWith: string[] = data.agrees_with || []
+    let conflictsWith: string[] = data.conflictsWith || []
+    let agreessWith: string[] = data.agreessWith || []
     
     // Determine thought type based on message content and backend data
     let thoughtType: AgentThought['type'] = 'analysis'

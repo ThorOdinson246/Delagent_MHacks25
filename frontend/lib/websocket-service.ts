@@ -8,6 +8,12 @@ class WebSocketService {
   private reconnectDelay = 1000;
 
   connect() {
+    // Only connect on client side
+    if (typeof window === 'undefined') {
+      console.log('WebSocket connection skipped - server side rendering');
+      return;
+    }
+
     if (this.socket?.connected) {
       console.log('WebSocket already connected');
       return;
@@ -15,7 +21,7 @@ class WebSocketService {
 
     console.log('Connecting to WebSocket server...');
     
-    this.socket = io('http://localhost:8000', {
+    this.socket = io('http://localhost:3001', {
       transports: ['websocket', 'polling'],
       timeout: 20000,
     });
@@ -55,6 +61,12 @@ class WebSocketService {
     this.socket.on('scheduling-update', (data) => {
       console.log('Received scheduling update:', data);
       this.handleSchedulingUpdate(data);
+    });
+
+    // Listen for agent interactions (from Node.js backend)
+    this.socket.on('agent-interaction', (data) => {
+      console.log('Received agent interaction:', data);
+      this.handleNegotiationUpdate(data);
     });
 
     // Listen for generic messages (from Python backend)

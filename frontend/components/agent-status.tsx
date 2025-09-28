@@ -74,8 +74,8 @@ export function AgentStatus() {
           reasoning: data.reasoning || '',
           confidence: data.confidence || 85,
           timestamp: data.timestamp || new Date().toISOString(),
-          conflictsWith: data.conflicts_with || [],
-          agreessWith: data.agrees_with || []
+          conflictsWith: data.conflictsWith || [],
+          agreessWith: data.agreessWith || []
         }
 
         setAgents(prev => prev.map(agent => {
