@@ -1,4 +1,4 @@
-# 🤖 MHacks2025 - AI Multi-Agent Scheduling Platform
+# 🤖 Delagent - AI Multi-Agent Scheduling Platform
 
 A revolutionary **voice-first, autonomous AI scheduling platform** where intelligent agents negotiate optimal meeting times using real calendar data, powered by **Gemini AI** and featuring live agent negotiations.
 
