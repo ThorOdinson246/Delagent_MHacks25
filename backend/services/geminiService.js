@@ -48,17 +48,30 @@ export async function extractMeetingIntent(transcript) {
         2.  "preferred_date": The preferred date in "YYYY-MM-DD" format. Infer from terms like "today", "tomorrow", or specific dates.
         3.  "preferred_time": The preferred time in "HH:MM" (24-hour) format.
         4.  "duration_minutes": The duration of the meeting in minutes. Default to 60 if not specified.
+        5.  "specific_agent": If the user mentions meeting with a specific person (Alice, Bob, Charlie), extract their name. Otherwise, leave null for multi-agent scheduling.
 
         Return ONLY the JSON object. Do not include any other text or markdown formatting.
 
-        Example:
+        Examples:
+        
         Transcript: "schedule a marketing sync for tomorrow at 2:30 pm for 45 minutes"
         JSON Output:
         {
             "title": "marketing sync",
             "preferred_date": "${tomorrowDate}",
             "preferred_time": "14:30",
-            "duration_minutes": 45
+            "duration_minutes": 45,
+            "specific_agent": null
+        }
+        
+        Transcript: "set up a meeting with Alice tomorrow at 10am"
+        JSON Output:
+        {
+            "title": "meeting with Alice",
+            "preferred_date": "${tomorrowDate}",
+            "preferred_time": "10:00",
+            "duration_minutes": 60,
+            "specific_agent": "alice"
         }
     `;
 
@@ -74,11 +87,21 @@ export async function extractMeetingIntent(transcript) {
                 nextWeekday.setDate(nextWeekday.getDate() + 1);
             }
             
+            // Extract specific agent from transcript
+            const lowerTranscript = transcript.toLowerCase();
+            let specificAgent = null;
+            if (lowerTranscript.includes("alice")) specificAgent = "alice";
+            else if (lowerTranscript.includes("bob")) specificAgent = "bob";
+            else if (lowerTranscript.includes("charlie")) specificAgent = "charlie";
+
             return {
-                title: "Meeting from Voice",
+                title: transcript.includes("doctor") || transcript.includes("appointment") ? 
+                       (transcript.includes("doctor") ? "Doctor's appointment" : "appointment") :
+                       transcript.includes("meeting") ? "meeting" : "Meeting from Voice",
                 preferred_date: nextWeekday.toISOString().split('T')[0],
-                preferred_time: "14:00",
-                duration_minutes: 60
+                preferred_time: transcript.includes("9") ? "09:00" : "14:00",
+                duration_minutes: 60,
+                specific_agent: specificAgent
             };
         }
 
@@ -119,21 +142,32 @@ export async function generateSpokenResponse(negotiationResult) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" });
 
     const prompt = `
-        You are an intelligent scheduling assistant. Your task is to create a friendly, concise, and natural-sounding response to the user based on the results of a meeting negotiation.
+        You are an intelligent scheduling assistant. Your task is to create a friendly, descriptive, and natural-sounding response to the user based on the results of a meeting negotiation.
 
         Here is the negotiation result in JSON format:
         ${JSON.stringify(negotiationResult, null, 2)}
 
-        Based on this data, generate a spoken response for the user.
-        - If 'success' is true and 'available_slots' is not empty, confirm that you found available times and state the best option clearly (the first one in the list). Mention the day, date, and time.
-        - If 'success' is false or 'available_slots' is empty, politely inform the user that no slots were found and suggest they try a different time.
-        - The response should be a single, fluid sentence. Do not ask a question.
+        Based on this data, generate a spoken response for the user:
+        
+        **If successful (available slots found):**
+        - If the first slot matches the user's preferred time exactly: "Perfect! I scheduled your [title] for [day, date] at [time] as requested."
+        - If the first slot is different from preferred time: "I found a great time for your [title]. The requested time had conflicts, but I found [day, date] at [time] which works well for everyone."
+        
+        **If no slots found:**
+        - Be specific about why: "Unfortunately, your requested time on [day, date] at [time] has conflicts with existing commitments. Let me suggest some alternative times that work better."
+        
+        **Always include:**
+        - The meeting title
+        - Specific day, date, and time
+        - Brief explanation of why this time works or why the original didn't
+        - If there were conflicts, mention them briefly but positively
+        
+        **Tone:** Professional but conversational, helpful, and solution-focused.
 
-        Example 1 (Success):
-        "Okay, I found an available slot for your meeting on Monday, September 29th at 2:00 PM."
-
-        Example 2 (Failure):
-        "Sorry, I couldn't find any available times for that request. Would you like to try another day or time?"
+        Examples:
+        "Great! I scheduled your team meeting for Monday, September 29th at 8:00 AM as requested. All three agents are available."
+        
+        "I found an excellent time for your doctor's appointment. Your requested 8 AM slot had some conflicts, but Tuesday, September 30th at 11:00 AM works perfectly and avoids any scheduling issues."
     `;
 
     try {
@@ -142,9 +176,22 @@ export async function generateSpokenResponse(negotiationResult) {
             console.log("🔧 Using mock spoken response for development");
             if (negotiationResult.success && negotiationResult.available_slots?.length > 0) {
                 const firstSlot = negotiationResult.available_slots[0];
-                return `I found an available slot for your meeting on ${firstSlot.day_of_week} at ${firstSlot.time_formatted}. Would you like me to schedule it?`;
+                const meetingTitle = negotiationResult.meeting_request?.title || "meeting";
+                const requestedTime = negotiationResult.meeting_request?.preferred_time || "requested time";
+                
+                // Check if the suggested time matches the requested time
+                const isExactMatch = firstSlot.time_formatted === requestedTime;
+                
+                if (isExactMatch) {
+                    return `Perfect! I scheduled your ${meetingTitle} for ${firstSlot.day_of_week}, ${firstSlot.date_formatted} at ${firstSlot.time_formatted} as requested. All agents are available at this time.`;
+                } else {
+                    return `I found an excellent time for your ${meetingTitle}. Your requested ${requestedTime} slot had some scheduling conflicts, but ${firstSlot.day_of_week}, ${firstSlot.date_formatted} at ${firstSlot.time_formatted} works perfectly and avoids any issues.`;
+                }
             } else {
-                return "I couldn't find any available times for that request. Would you like to try another day or time?";
+                const meetingTitle = negotiationResult.meeting_request?.title || "meeting";
+                const requestedDate = negotiationResult.meeting_request?.preferred_date || "requested date";
+                const requestedTime = negotiationResult.meeting_request?.preferred_time || "requested time";
+                return `Unfortunately, your requested time for the ${meetingTitle} on ${requestedDate} at ${requestedTime} has conflicts with existing commitments. Let me suggest some alternative times that work better for everyone.`;
             }
         }
 

@@ -42,6 +42,7 @@ class MeetingRequest(BaseModel):
     preferred_time: str  # HH:MM format
     duration_minutes: int
     is_ai_agent_meeting: bool = True  # Default to AI agent meeting
+    specific_agent: Optional[str] = None  # "alice", "bob", "charlie", or None for multi-agent
 
 class TimeSlot(BaseModel):
     start_time: str
@@ -207,6 +208,84 @@ class APINegotiation:
             slot["explanation"] = await self.generate_slot_explanation(slot, preferred_datetime, i)
         
         return available_slots[:3]  # Return top 3 options for 3-agent negotiation
+    
+    async def find_single_agent_slots(self, request: MeetingRequest) -> List[Dict[str, Any]]:
+        """Find available time slots for a specific agent only"""
+        preferred_date = datetime.strptime(request.preferred_date, "%Y-%m-%d")
+        preferred_time = datetime.strptime(request.preferred_time, "%H:%M")
+        preferred_datetime = preferred_date.replace(
+            hour=preferred_time.hour, 
+            minute=preferred_time.minute, 
+            second=0, 
+            microsecond=0
+        )
+        
+        duration = request.duration_minutes
+        
+        # Map agent names to user IDs
+        agent_user_map = {
+            "alice": "alice",
+            "bob": "bob", 
+            "charlie": "charlie"
+        }
+        
+        user_id = agent_user_map.get(request.specific_agent.lower())
+        if not user_id:
+            raise HTTPException(status_code=400, detail=f"Unknown agent: {request.specific_agent}")
+        
+        # Search window: 5 days before and after preferred date
+        today = datetime.now().date()
+        db_end_date = datetime(2025, 10, 27).date()
+        search_start = max(preferred_datetime - timedelta(days=5), datetime.combine(today, datetime.min.time()))
+        search_end = min(preferred_datetime + timedelta(days=5), datetime.combine(db_end_date, datetime.max.time()))
+        
+        available_slots = []
+        
+        # Check each day in the search window
+        current_date = search_start.date()
+        end_date = search_end.date()
+        
+        while current_date <= end_date:
+            # Skip weekends for business meetings
+            if current_date.weekday() < 5:  # Monday=0, Friday=4
+                # Check time slots from 8 AM to 6 PM
+                for hour in range(8, 18):
+                    for minute in [0, 30]:  # Check every 30 minutes
+                        test_start = datetime.combine(current_date, datetime.min.time()).replace(hour=hour, minute=minute)
+                        test_end = test_start + timedelta(minutes=duration)
+                        
+                        # Don't suggest times in the past
+                        if test_start <= datetime.now():
+                            continue
+                        
+                        # Check for conflicts with the specific agent only
+                        conflicts = await self.calendar_service.check_time_conflict(user_id, test_start, test_end)
+                        
+                        if not conflicts:
+                            # Calculate quality score
+                            quality_score = self.calculate_slot_quality(test_start, preferred_datetime)
+                            
+                            available_slots.append({
+                                "start_time": test_start,
+                                "end_time": test_end,
+                                "quality_score": quality_score,
+                                "duration_minutes": duration,
+                                "specific_agent": request.specific_agent
+                            })
+            
+            current_date += timedelta(days=1)
+        
+        # Sort by quality score (higher is better)
+        available_slots.sort(key=lambda x: x["quality_score"], reverse=True)
+        
+        # Generate dynamic explanations
+        for i, slot in enumerate(available_slots[:3]):
+            if i == 0 and slot["start_time"] == preferred_datetime:
+                slot["explanation"] = f"Perfect! {request.specific_agent.title()} is available at your requested time."
+            else:
+                slot["explanation"] = f"Great alternative time that works well with {request.specific_agent.title()}'s schedule."
+        
+        return available_slots[:3]  # Return top 3 options
     
     async def find_external_meeting_slots_api(self, preferred_datetime: datetime, duration: int) -> List[Dict[str, Any]]:
         """Find slots for external meetings (only Pappu's schedule) - API version"""
@@ -689,11 +768,18 @@ async def negotiate_meeting(request: MeetingRequest):
     """
     try:
         # Send initial negotiation message
+        if request.specific_agent:
         await manager.broadcast(json.dumps({
             "type": "negotiation_start",
-            "message": f"🤖 Starting negotiation for '{request.title}'",
-            "timestamp": datetime.now().isoformat()
-        }))
+                "message": f"🤖 Checking {request.specific_agent.title()}'s calendar for '{request.title}'",
+                "timestamp": datetime.now().isoformat()
+            }))
+        else:
+            await manager.broadcast(json.dumps({
+                "type": "negotiation_start",
+                "message": f"🤖 Starting 3-agent negotiation for '{request.title}'",
+                "timestamp": datetime.now().isoformat()
+            }))
         
         # Send agent reasoning messages
         await manager.broadcast(json.dumps({
@@ -847,8 +933,11 @@ async def negotiate_meeting(request: MeetingRequest):
                 "timestamp": datetime.now().isoformat()
             }))
         
-        # Find available slots
-        available_slots = await negotiation.find_available_slots(request)
+        # Find available slots - handle specific agent or multi-agent
+        if request.specific_agent:
+            available_slots = await negotiation.find_single_agent_slots(request)
+        else:
+            available_slots = await negotiation.find_available_slots(request)
         
         # Calculate search window
         preferred_date = datetime.strptime(request.preferred_date, "%Y-%m-%d")
