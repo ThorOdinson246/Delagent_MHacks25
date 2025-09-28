@@ -1,6 +1,8 @@
 {
   "/page": "app/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/api/stt/route": "app/api/stt/route.js",
-  "/calendar/page": "app/calendar/page.js"
+  "/calendar/page": "app/calendar/page.js",
+  "/agents/page": "app/agents/page.js",
+  "/settings/page": "app/settings/page.js",
+  "/api/stt/route": "app/api/stt/route.js"
 }

@@ -53,7 +53,7 @@ export interface CalendarBlock {
   created_at: string
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002"
 
 class ApiService {
   private async fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {

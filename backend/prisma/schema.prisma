@@ -1,0 +1,248 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Users in the system
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // User's agent configuration
+  agent              Agent?
+  // Meetings where user is organizer
+  organizedMeetings  Meeting[] @relation("Organizer")
+  // Meeting participants
+  meetingParticipants MeetingParticipant[]
+  // Calendar blocks
+  calendarBlocks     CalendarBlock[]
+
+  @@map("users")
+}
+
+// AI Agent representing each user
+model Agent {
+  id           String    @id @default(cuid())
+  userId       String    @unique @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Agent personality and behavior
+  name         String
+  personality  String    // e.g., "Diplomatic", "Direct", "Flexible"
+  flexibility  Int       @default(5) // 1-10 scale
+  priorityData String    @default("[]") @map("priority_data") // JSON string of priority factors
+  
+  // Agent status
+  status       String    @default("IDLE") // IDLE, ACTIVE, NEGOTIATING, SCHEDULING, ERROR
+  currentTask  String?   @map("current_task")
+  
+  // Agent configuration
+  config       String    @default("{}") // JSON string
+  isActive     Boolean   @default(true) @map("is_active")
+  
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Negotiations this agent participated in
+  negotiations NegotiationMessage[]
+
+  @@map("agents")
+}
+
+// Meetings
+model Meeting {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  
+  // Organizer
+  organizerId String      @map("organizer_id")
+  organizer   User        @relation("Organizer", fields: [organizerId], references: [id])
+  
+  // Timing
+  preferredStartTime DateTime? @map("preferred_start_time")
+  preferredEndTime   DateTime? @map("preferred_end_time")
+  finalStartTime     DateTime? @map("final_start_time")
+  finalEndTime       DateTime? @map("final_end_time")
+  durationMinutes    Int       @map("duration_minutes")
+  
+  // Status
+  status      String       @default("PENDING") // PENDING, NEGOTIATING, SCHEDULED, COMPLETED, CANCELLED, FAILED
+  priority    Int          @default(5) // 1-10 scale
+  
+  // Metadata
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  scheduledAt DateTime?    @map("scheduled_at")
+  
+  // Relations
+  participants MeetingParticipant[]
+  negotiation  Negotiation?
+  timeslots    TimeSlot[]
+
+  @@map("meetings")
+}
+
+// Meeting participants
+model MeetingParticipant {
+  id        String @id @default(cuid())
+  meetingId String @map("meeting_id")
+  userId    String @map("user_id")
+  
+  meeting   Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  status    String  @default("INVITED") // INVITED, ACCEPTED, DECLINED, TENTATIVE
+  response  String?
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([meetingId, userId])
+  @@map("meeting_participants")
+}
+
+// Available time slots for meetings
+model TimeSlot {
+  id          String   @id @default(cuid())
+  meetingId   String   @map("meeting_id")
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  
+  startTime   DateTime @map("start_time")
+  endTime     DateTime @map("end_time")
+  qualityScore Float   @map("quality_score") // 0-1 indicating how good this slot is
+  
+  // Metadata
+  dayOfWeek    String  @map("day_of_week")
+  conflictsData String @default("[]") @map("conflicts_data") // JSON string of conflict reasons
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("time_slots")
+}
+
+// Negotiation sessions between agents
+model Negotiation {
+  id        String    @id @default(cuid())
+  meetingId String    @unique @map("meeting_id")
+  meeting   Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  
+  // Negotiation status
+  status     String    @default("IN_PROGRESS") // IN_PROGRESS, AGREED, FAILED, TIMEOUT
+  currentRound Int     @default(1) @map("current_round")
+  maxRounds    Int     @default(10) @map("max_rounds")
+  
+  // Timing
+  startedAt    DateTime @default(now()) @map("started_at")
+  endedAt      DateTime? @map("ended_at")
+  timeoutAt    DateTime  @map("timeout_at")
+  
+  // Results
+  finalDecision String? @map("final_decision") // JSON string of final agreed upon slot
+  reasoning     String? // Why this decision was made
+  availableSlots String? @map("available_slots") // JSON string of available time slots
+  
+  // Relations
+  messages      NegotiationMessage[]
+
+  @@map("negotiations")
+}
+
+// Messages exchanged during negotiation
+model NegotiationMessage {
+  id            String      @id @default(cuid())
+  negotiationId String      @map("negotiation_id")
+  negotiation   Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+  
+  // Agent details
+  fromAgentId   String      @map("from_agent_id")
+  fromAgent     Agent       @relation(fields: [fromAgentId], references: [id])
+  
+  // Message content
+  round         Int
+  messageType   String      @map("message_type") // PROPOSAL, COUNTER_PROPOSAL, ACCEPTANCE, REJECTION, QUERY, CONSTRAINT
+  content       String      // JSON string of structured message content
+  proposedTime  DateTime?   @map("proposed_time")
+  reasoning     String
+  conflictsData String      @default("[]") @map("conflicts_data") // JSON string of conflicts
+  
+  // Metadata
+  timestamp     DateTime    @default(now())
+
+  @@map("negotiation_messages")
+}
+
+// Calendar blocks (existing commitments)
+model CalendarBlock {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  
+  startTime   DateTime  @map("start_time")
+  endTime     DateTime  @map("end_time")
+  
+  blockType   String    @default("BUSY") @map("block_type") // BUSY, FREE, TENTATIVE, FOCUS_TIME, BREAK, TRAVEL
+  priority    Int       @default(5) // 1-10 scale
+  isFlexible  Boolean   @default(false) @map("is_flexible")
+  
+  // Metadata
+  source      String?   // e.g., "google_calendar", "manual"
+  externalId  String?   @map("external_id") // ID from external calendar
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("calendar_blocks")
+}
+
+// Voice interaction logs
+model VoiceInteraction {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  
+  // Audio processing
+  audioUrl    String?  @map("audio_url")
+  transcript  String
+  extractedInfo String @default("{}") @map("extracted_info") // JSON string
+  
+  // Processing results
+  meetingRequest String? @map("meeting_request") // JSON string
+  processingTime Int     @map("processing_time") // milliseconds
+  confidence    Float   // 0-1 confidence score
+  
+  // Response
+  responseText  String? @map("response_text")
+  ttsUrl       String?  @map("tts_url")
+  
+  timestamp    DateTime @default(now())
+
+  @@map("voice_interactions")
+}
+
+// System logs for debugging and monitoring
+model SystemLog {
+  id        String    @id @default(cuid())
+  level     String    // DEBUG, INFO, WARN, ERROR
+  component String    // e.g., "agent", "negotiation", "voice", "api"
+  message   String
+  data      String?   @default("{}") // JSON string
+  error     String?
+  
+  timestamp DateTime  @default(now())
+
+  @@map("system_logs")
+}

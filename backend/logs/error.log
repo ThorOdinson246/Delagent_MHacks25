@@ -1,0 +1,254 @@
+[2025-09-28T02:07:58.190Z] ERROR: Gemini API call failed [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+Error: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at makeRequest (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@google/generative-ai/dist/index.js:212:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async generateContent (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@google/generative-ai/dist/index.js:536:22)
+    at GeminiService.extractMeetingDetails (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/geminiService.ts:83:22)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/voice.ts:30:30)
+[2025-09-28T02:09:09.804Z] ERROR: Negotiation failed 
+Invalid `this.prisma.agent.findMany()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:44
+
+  57 const availableSlots: TimeSlot[] = [];
+  58 
+  59 // Get all agents
+→ 60 const agents = await this.prisma.agent.findMany({
+       where: {
+         is_active: true,
+         ~~~~~~~~~
+     ?   AND?: AgentWhereInput | AgentWhereInput[],
+     ?   OR?: AgentWhereInput[],
+     ?   NOT?: AgentWhereInput | AgentWhereInput[],
+     ?   id?: StringFilter | String,
+     ?   userId?: StringFilter | String,
+     ?   name?: StringFilter | String,
+     ?   personality?: StringFilter | String,
+     ?   flexibility?: IntFilter | Int,
+     ?   priorityData?: StringFilter | String,
+     ?   status?: StringFilter | String,
+     ?   currentTask?: StringNullableFilter | String | Null,
+     ?   config?: StringFilter | String,
+     ?   isActive?: BoolFilter | Boolean,
+     ?   createdAt?: DateTimeFilter | DateTime,
+     ?   updatedAt?: DateTimeFilter | DateTime,
+     ?   user?: UserRelationFilter | UserWhereInput,
+     ?   negotiations?: NegotiationMessageListRelationFilter
+       }
+     })
+
+Unknown argument `is_active`. Did you mean `isActive`? Available options are marked with ?.
+PrismaClientValidationError: 
+Invalid `this.prisma.agent.findMany()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:44
+
+  57 const availableSlots: TimeSlot[] = [];
+  58 
+  59 // Get all agents
+→ 60 const agents = await this.prisma.agent.findMany({
+       where: {
+         is_active: true,
+         ~~~~~~~~~
+     ?   AND?: AgentWhereInput | AgentWhereInput[],
+     ?   OR?: AgentWhereInput[],
+     ?   NOT?: AgentWhereInput | AgentWhereInput[],
+     ?   id?: StringFilter | String,
+     ?   userId?: StringFilter | String,
+     ?   name?: StringFilter | String,
+     ?   personality?: StringFilter | String,
+     ?   flexibility?: IntFilter | Int,
+     ?   priorityData?: StringFilter | String,
+     ?   status?: StringFilter | String,
+     ?   currentTask?: StringNullableFilter | String | Null,
+     ?   config?: StringFilter | String,
+     ?   isActive?: BoolFilter | Boolean,
+     ?   createdAt?: DateTimeFilter | DateTime,
+     ?   updatedAt?: DateTimeFilter | DateTime,
+     ?   user?: UserRelationFilter | UserWhereInput,
+     ?   negotiations?: NegotiationMessageListRelationFilter
+       }
+     })
+
+Unknown argument `is_active`. Did you mean `isActive`? Available options are marked with ?.
+    at wn (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at NegotiationService.findAvailableSlots (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:20)
+    at NegotiationService.negotiateMeeting (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:169:30)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/negotiation.ts:26:20)
+[2025-09-28T02:09:09.804Z] ERROR: Negotiation failed 
+Invalid `this.prisma.agent.findMany()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:44
+
+  57 const availableSlots: TimeSlot[] = [];
+  58 
+  59 // Get all agents
+→ 60 const agents = await this.prisma.agent.findMany({
+       where: {
+         is_active: true,
+         ~~~~~~~~~
+     ?   AND?: AgentWhereInput | AgentWhereInput[],
+     ?   OR?: AgentWhereInput[],
+     ?   NOT?: AgentWhereInput | AgentWhereInput[],
+     ?   id?: StringFilter | String,
+     ?   userId?: StringFilter | String,
+     ?   name?: StringFilter | String,
+     ?   personality?: StringFilter | String,
+     ?   flexibility?: IntFilter | Int,
+     ?   priorityData?: StringFilter | String,
+     ?   status?: StringFilter | String,
+     ?   currentTask?: StringNullableFilter | String | Null,
+     ?   config?: StringFilter | String,
+     ?   isActive?: BoolFilter | Boolean,
+     ?   createdAt?: DateTimeFilter | DateTime,
+     ?   updatedAt?: DateTimeFilter | DateTime,
+     ?   user?: UserRelationFilter | UserWhereInput,
+     ?   negotiations?: NegotiationMessageListRelationFilter
+       }
+     })
+
+Unknown argument `is_active`. Did you mean `isActive`? Available options are marked with ?.
+PrismaClientValidationError: 
+Invalid `this.prisma.agent.findMany()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:44
+
+  57 const availableSlots: TimeSlot[] = [];
+  58 
+  59 // Get all agents
+→ 60 const agents = await this.prisma.agent.findMany({
+       where: {
+         is_active: true,
+         ~~~~~~~~~
+     ?   AND?: AgentWhereInput | AgentWhereInput[],
+     ?   OR?: AgentWhereInput[],
+     ?   NOT?: AgentWhereInput | AgentWhereInput[],
+     ?   id?: StringFilter | String,
+     ?   userId?: StringFilter | String,
+     ?   name?: StringFilter | String,
+     ?   personality?: StringFilter | String,
+     ?   flexibility?: IntFilter | Int,
+     ?   priorityData?: StringFilter | String,
+     ?   status?: StringFilter | String,
+     ?   currentTask?: StringNullableFilter | String | Null,
+     ?   config?: StringFilter | String,
+     ?   isActive?: BoolFilter | Boolean,
+     ?   createdAt?: DateTimeFilter | DateTime,
+     ?   updatedAt?: DateTimeFilter | DateTime,
+     ?   user?: UserRelationFilter | UserWhereInput,
+     ?   negotiations?: NegotiationMessageListRelationFilter
+       }
+     })
+
+Unknown argument `is_active`. Did you mean `isActive`? Available options are marked with ?.
+    at wn (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at NegotiationService.findAvailableSlots (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:20)
+    at NegotiationService.negotiateMeeting (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:169:30)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/negotiation.ts:26:20)
+[2025-09-28T02:24:57.616Z] ERROR: Failed to create meeting 
+Invalid `prisma.meeting.create()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:42
+
+  101 } = req.body;
+  102 
+  103 // Create the meeting
+→ 104 const meeting = await prisma.meeting.create({
+        data: {
+          title: "API Test Meeting",
+          description: "Testing meeting creation via API",
+          organizerId: undefined,
+          preferredStartTime: null,
+          preferredEndTime: null,
+          priority: "medium",
+          status: "PENDING",
+      +   durationMinutes: Int
+        }
+      })
+
+Argument `durationMinutes` is missing.
+PrismaClientValidationError: 
+Invalid `prisma.meeting.create()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:42
+
+  101 } = req.body;
+  102 
+  103 // Create the meeting
+→ 104 const meeting = await prisma.meeting.create({
+        data: {
+          title: "API Test Meeting",
+          description: "Testing meeting creation via API",
+          organizerId: undefined,
+          preferredStartTime: null,
+          preferredEndTime: null,
+          priority: "medium",
+          status: "PENDING",
+      +   durationMinutes: Int
+        }
+      })
+
+Argument `durationMinutes` is missing.
+    at wn (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:21)
+[2025-09-28T02:27:25.795Z] ERROR: Failed to create meeting 
+Invalid `prisma.meeting.create()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:42
+
+  101 } = req.body;
+  102 
+  103 // Create the meeting
+→ 104 const meeting = await prisma.meeting.create({
+        data: {
+          title: "API Test Meeting",
+          description: "Testing meeting creation via API",
+          organizerId: undefined,
+          preferredStartTime: null,
+          preferredEndTime: null,
+          priority: "medium",
+          status: "PENDING",
+      +   durationMinutes: Int
+        }
+      })
+
+Argument `durationMinutes` is missing.
+PrismaClientValidationError: 
+Invalid `prisma.meeting.create()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:42
+
+  101 } = req.body;
+  102 
+  103 // Create the meeting
+→ 104 const meeting = await prisma.meeting.create({
+        data: {
+          title: "API Test Meeting",
+          description: "Testing meeting creation via API",
+          organizerId: undefined,
+          preferredStartTime: null,
+          preferredEndTime: null,
+          priority: "medium",
+          status: "PENDING",
+      +   durationMinutes: Int
+        }
+      })
+
+Argument `durationMinutes` is missing.
+    at wn (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:21)
+[2025-09-28T02:34:39.420Z] ERROR: Gemini API call failed [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+Error: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at makeRequest (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@google/generative-ai/dist/index.js:212:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async generateContent (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@google/generative-ai/dist/index.js:536:22)
+    at GeminiService.extractMeetingDetails (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/geminiService.ts:83:22)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/voice.ts:352:30)

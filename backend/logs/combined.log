@@ -1,0 +1,447 @@
+[2025-09-28T02:05:01.310Z] INFO: Database connected successfully
+[2025-09-28T02:05:01.315Z] INFO: Server running on port 8000
+[2025-09-28T02:05:01.316Z] INFO: Environment: development
+[2025-09-28T02:05:18.052Z] INFO: HTTP Request
+[2025-09-28T02:05:47.181Z] INFO: HTTP Request
+[2025-09-28T02:06:33.663Z] INFO: HTTP Request
+[2025-09-28T02:07:57.936Z] INFO: Processing voice input
+[2025-09-28T02:07:58.190Z] ERROR: Gemini API call failed [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+Error: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at makeRequest (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@google/generative-ai/dist/index.js:212:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async generateContent (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@google/generative-ai/dist/index.js:536:22)
+    at GeminiService.extractMeetingDetails (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/geminiService.ts:83:22)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/voice.ts:30:30)
+[2025-09-28T02:07:58.224Z] INFO: Voice processing completed
+[2025-09-28T02:07:58.235Z] INFO: HTTP Request
+[2025-09-28T02:09:09.788Z] INFO: Starting meeting negotiation
+[2025-09-28T02:09:09.789Z] INFO: Starting meeting negotiation
+[2025-09-28T02:09:09.804Z] ERROR: Negotiation failed 
+Invalid `this.prisma.agent.findMany()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:44
+
+  57 const availableSlots: TimeSlot[] = [];
+  58 
+  59 // Get all agents
+→ 60 const agents = await this.prisma.agent.findMany({
+       where: {
+         is_active: true,
+         ~~~~~~~~~
+     ?   AND?: AgentWhereInput | AgentWhereInput[],
+     ?   OR?: AgentWhereInput[],
+     ?   NOT?: AgentWhereInput | AgentWhereInput[],
+     ?   id?: StringFilter | String,
+     ?   userId?: StringFilter | String,
+     ?   name?: StringFilter | String,
+     ?   personality?: StringFilter | String,
+     ?   flexibility?: IntFilter | Int,
+     ?   priorityData?: StringFilter | String,
+     ?   status?: StringFilter | String,
+     ?   currentTask?: StringNullableFilter | String | Null,
+     ?   config?: StringFilter | String,
+     ?   isActive?: BoolFilter | Boolean,
+     ?   createdAt?: DateTimeFilter | DateTime,
+     ?   updatedAt?: DateTimeFilter | DateTime,
+     ?   user?: UserRelationFilter | UserWhereInput,
+     ?   negotiations?: NegotiationMessageListRelationFilter
+       }
+     })
+
+Unknown argument `is_active`. Did you mean `isActive`? Available options are marked with ?.
+PrismaClientValidationError: 
+Invalid `this.prisma.agent.findMany()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:44
+
+  57 const availableSlots: TimeSlot[] = [];
+  58 
+  59 // Get all agents
+→ 60 const agents = await this.prisma.agent.findMany({
+       where: {
+         is_active: true,
+         ~~~~~~~~~
+     ?   AND?: AgentWhereInput | AgentWhereInput[],
+     ?   OR?: AgentWhereInput[],
+     ?   NOT?: AgentWhereInput | AgentWhereInput[],
+     ?   id?: StringFilter | String,
+     ?   userId?: StringFilter | String,
+     ?   name?: StringFilter | String,
+     ?   personality?: StringFilter | String,
+     ?   flexibility?: IntFilter | Int,
+     ?   priorityData?: StringFilter | String,
+     ?   status?: StringFilter | String,
+     ?   currentTask?: StringNullableFilter | String | Null,
+     ?   config?: StringFilter | String,
+     ?   isActive?: BoolFilter | Boolean,
+     ?   createdAt?: DateTimeFilter | DateTime,
+     ?   updatedAt?: DateTimeFilter | DateTime,
+     ?   user?: UserRelationFilter | UserWhereInput,
+     ?   negotiations?: NegotiationMessageListRelationFilter
+       }
+     })
+
+Unknown argument `is_active`. Did you mean `isActive`? Available options are marked with ?.
+    at wn (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at NegotiationService.findAvailableSlots (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:20)
+    at NegotiationService.negotiateMeeting (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:169:30)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/negotiation.ts:26:20)
+[2025-09-28T02:09:09.804Z] ERROR: Negotiation failed 
+Invalid `this.prisma.agent.findMany()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:44
+
+  57 const availableSlots: TimeSlot[] = [];
+  58 
+  59 // Get all agents
+→ 60 const agents = await this.prisma.agent.findMany({
+       where: {
+         is_active: true,
+         ~~~~~~~~~
+     ?   AND?: AgentWhereInput | AgentWhereInput[],
+     ?   OR?: AgentWhereInput[],
+     ?   NOT?: AgentWhereInput | AgentWhereInput[],
+     ?   id?: StringFilter | String,
+     ?   userId?: StringFilter | String,
+     ?   name?: StringFilter | String,
+     ?   personality?: StringFilter | String,
+     ?   flexibility?: IntFilter | Int,
+     ?   priorityData?: StringFilter | String,
+     ?   status?: StringFilter | String,
+     ?   currentTask?: StringNullableFilter | String | Null,
+     ?   config?: StringFilter | String,
+     ?   isActive?: BoolFilter | Boolean,
+     ?   createdAt?: DateTimeFilter | DateTime,
+     ?   updatedAt?: DateTimeFilter | DateTime,
+     ?   user?: UserRelationFilter | UserWhereInput,
+     ?   negotiations?: NegotiationMessageListRelationFilter
+       }
+     })
+
+Unknown argument `is_active`. Did you mean `isActive`? Available options are marked with ?.
+PrismaClientValidationError: 
+Invalid `this.prisma.agent.findMany()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:44
+
+  57 const availableSlots: TimeSlot[] = [];
+  58 
+  59 // Get all agents
+→ 60 const agents = await this.prisma.agent.findMany({
+       where: {
+         is_active: true,
+         ~~~~~~~~~
+     ?   AND?: AgentWhereInput | AgentWhereInput[],
+     ?   OR?: AgentWhereInput[],
+     ?   NOT?: AgentWhereInput | AgentWhereInput[],
+     ?   id?: StringFilter | String,
+     ?   userId?: StringFilter | String,
+     ?   name?: StringFilter | String,
+     ?   personality?: StringFilter | String,
+     ?   flexibility?: IntFilter | Int,
+     ?   priorityData?: StringFilter | String,
+     ?   status?: StringFilter | String,
+     ?   currentTask?: StringNullableFilter | String | Null,
+     ?   config?: StringFilter | String,
+     ?   isActive?: BoolFilter | Boolean,
+     ?   createdAt?: DateTimeFilter | DateTime,
+     ?   updatedAt?: DateTimeFilter | DateTime,
+     ?   user?: UserRelationFilter | UserWhereInput,
+     ?   negotiations?: NegotiationMessageListRelationFilter
+       }
+     })
+
+Unknown argument `is_active`. Did you mean `isActive`? Available options are marked with ?.
+    at wn (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at NegotiationService.findAvailableSlots (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:60:20)
+    at NegotiationService.negotiateMeeting (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/negotiationService.ts:169:30)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/negotiation.ts:26:20)
+[2025-09-28T02:09:09.805Z] WARN: HTTP Request
+[2025-09-28T02:09:19.805Z] INFO: Shutting down gracefully...
+[2025-09-28T02:09:20.938Z] INFO: Database connected successfully
+[2025-09-28T02:09:20.944Z] INFO: Server running on port 8000
+[2025-09-28T02:09:20.944Z] INFO: Environment: development
+[2025-09-28T02:09:32.071Z] INFO: Shutting down gracefully...
+[2025-09-28T02:09:33.251Z] INFO: Database connected successfully
+[2025-09-28T02:09:33.255Z] INFO: Server running on port 8000
+[2025-09-28T02:09:33.255Z] INFO: Environment: development
+[2025-09-28T02:09:40.611Z] INFO: Shutting down gracefully...
+[2025-09-28T02:09:41.935Z] INFO: Database connected successfully
+[2025-09-28T02:09:41.943Z] INFO: Server running on port 8000
+[2025-09-28T02:09:41.944Z] INFO: Environment: development
+[2025-09-28T02:11:05.325Z] INFO: Shutting down gracefully...
+[2025-09-28T02:11:06.635Z] INFO: Database connected successfully
+[2025-09-28T02:11:06.639Z] INFO: Server running on port 8000
+[2025-09-28T02:11:06.639Z] INFO: Environment: development
+[2025-09-28T02:11:12.451Z] INFO: Shutting down gracefully...
+[2025-09-28T02:11:13.895Z] INFO: Database connected successfully
+[2025-09-28T02:11:13.904Z] INFO: Server running on port 8000
+[2025-09-28T02:11:13.904Z] INFO: Environment: development
+[2025-09-28T02:11:17.771Z] INFO: Shutting down gracefully...
+[2025-09-28T02:11:19.136Z] INFO: Database connected successfully
+[2025-09-28T02:11:19.142Z] INFO: Server running on port 8000
+[2025-09-28T02:11:19.142Z] INFO: Environment: development
+[2025-09-28T02:11:20.668Z] INFO: Shutting down gracefully...
+[2025-09-28T02:11:21.998Z] INFO: Database connected successfully
+[2025-09-28T02:11:22.005Z] INFO: Server running on port 8000
+[2025-09-28T02:11:22.006Z] INFO: Environment: development
+[2025-09-28T02:11:37.353Z] INFO: Shutting down gracefully...
+[2025-09-28T02:11:38.358Z] INFO: Database connected successfully
+[2025-09-28T02:11:38.363Z] INFO: Server running on port 8000
+[2025-09-28T02:11:38.364Z] INFO: Environment: development
+[2025-09-28T02:11:50.356Z] INFO: Shutting down gracefully...
+[2025-09-28T02:11:51.257Z] INFO: Database connected successfully
+[2025-09-28T02:11:51.261Z] INFO: Server running on port 8000
+[2025-09-28T02:11:51.261Z] INFO: Environment: development
+[2025-09-28T02:12:39.104Z] INFO: Shutting down gracefully...
+[2025-09-28T02:12:40.718Z] INFO: Database connected successfully
+[2025-09-28T02:12:40.727Z] INFO: Server running on port 8000
+[2025-09-28T02:12:40.728Z] INFO: Environment: development
+[2025-09-28T02:12:56.478Z] INFO: Shutting down gracefully...
+[2025-09-28T02:12:57.911Z] INFO: Database connected successfully
+[2025-09-28T02:12:57.919Z] INFO: Server running on port 8000
+[2025-09-28T02:12:57.920Z] INFO: Environment: development
+[2025-09-28T02:13:09.110Z] INFO: Shutting down gracefully...
+[2025-09-28T02:13:10.537Z] INFO: Database connected successfully
+[2025-09-28T02:13:10.554Z] INFO: Server running on port 8000
+[2025-09-28T02:13:10.558Z] INFO: Environment: development
+[2025-09-28T02:13:19.105Z] INFO: Shutting down gracefully...
+[2025-09-28T02:13:20.205Z] INFO: Database connected successfully
+[2025-09-28T02:13:20.213Z] INFO: Server running on port 8000
+[2025-09-28T02:13:20.214Z] INFO: Environment: development
+[2025-09-28T02:13:51.779Z] INFO: Shutting down gracefully...
+[2025-09-28T02:13:53.195Z] INFO: Database connected successfully
+[2025-09-28T02:13:53.201Z] INFO: Server running on port 8000
+[2025-09-28T02:13:53.201Z] INFO: Environment: development
+[2025-09-28T02:14:25.547Z] INFO: Shutting down gracefully...
+[2025-09-28T02:14:27.217Z] INFO: Database connected successfully
+[2025-09-28T02:14:27.223Z] INFO: Server running on port 8000
+[2025-09-28T02:14:27.223Z] INFO: Environment: development
+[2025-09-28T02:14:32.246Z] INFO: Shutting down gracefully...
+[2025-09-28T02:14:33.254Z] INFO: Database connected successfully
+[2025-09-28T02:14:33.257Z] INFO: Server running on port 8000
+[2025-09-28T02:14:33.258Z] INFO: Environment: development
+[2025-09-28T02:14:39.347Z] INFO: Shutting down gracefully...
+[2025-09-28T02:14:40.527Z] INFO: Database connected successfully
+[2025-09-28T02:14:40.532Z] INFO: Server running on port 8000
+[2025-09-28T02:14:40.532Z] INFO: Environment: development
+[2025-09-28T02:14:45.699Z] INFO: Shutting down gracefully...
+[2025-09-28T02:14:46.968Z] INFO: Database connected successfully
+[2025-09-28T02:14:46.973Z] INFO: Server running on port 8000
+[2025-09-28T02:14:46.973Z] INFO: Environment: development
+[2025-09-28T02:14:52.567Z] INFO: Shutting down gracefully...
+[2025-09-28T02:14:53.670Z] INFO: Database connected successfully
+[2025-09-28T02:14:53.675Z] INFO: Server running on port 8000
+[2025-09-28T02:14:53.675Z] INFO: Environment: development
+[2025-09-28T02:16:47.945Z] INFO: Database connected successfully
+[2025-09-28T02:19:39.529Z] INFO: Shutting down gracefully...
+[2025-09-28T02:19:43.080Z] INFO: Database connected successfully
+[2025-09-28T02:19:43.084Z] INFO: Server running on port 3002
+[2025-09-28T02:19:43.085Z] INFO: Environment: development
+[2025-09-28T02:19:51.756Z] WARN: HTTP Request
+[2025-09-28T02:19:55.966Z] WARN: HTTP Request
+[2025-09-28T02:20:06.493Z] INFO: Shutting down gracefully...
+[2025-09-28T02:20:08.336Z] INFO: Database connected successfully
+[2025-09-28T02:20:08.345Z] INFO: Server running on port 3002
+[2025-09-28T02:20:08.346Z] INFO: Environment: development
+[2025-09-28T02:22:27.283Z] INFO: HTTP Request
+[2025-09-28T02:22:34.560Z] INFO: HTTP Request
+[2025-09-28T02:22:50.511Z] INFO: HTTP Request
+[2025-09-28T02:24:57.525Z] INFO: HTTP Request
+[2025-09-28T02:24:57.537Z] INFO: HTTP Request
+[2025-09-28T02:24:57.550Z] INFO: HTTP Request
+[2025-09-28T02:24:57.563Z] WARN: HTTP Request
+[2025-09-28T02:24:57.590Z] WARN: HTTP Request
+[2025-09-28T02:24:57.616Z] ERROR: Failed to create meeting 
+Invalid `prisma.meeting.create()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:42
+
+  101 } = req.body;
+  102 
+  103 // Create the meeting
+→ 104 const meeting = await prisma.meeting.create({
+        data: {
+          title: "API Test Meeting",
+          description: "Testing meeting creation via API",
+          organizerId: undefined,
+          preferredStartTime: null,
+          preferredEndTime: null,
+          priority: "medium",
+          status: "PENDING",
+      +   durationMinutes: Int
+        }
+      })
+
+Argument `durationMinutes` is missing.
+PrismaClientValidationError: 
+Invalid `prisma.meeting.create()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:42
+
+  101 } = req.body;
+  102 
+  103 // Create the meeting
+→ 104 const meeting = await prisma.meeting.create({
+        data: {
+          title: "API Test Meeting",
+          description: "Testing meeting creation via API",
+          organizerId: undefined,
+          preferredStartTime: null,
+          preferredEndTime: null,
+          priority: "medium",
+          status: "PENDING",
+      +   durationMinutes: Int
+        }
+      })
+
+Argument `durationMinutes` is missing.
+    at wn (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:21)
+[2025-09-28T02:24:57.618Z] WARN: HTTP Request
+[2025-09-28T02:24:57.635Z] WARN: HTTP Request
+[2025-09-28T02:27:25.742Z] INFO: HTTP Request
+[2025-09-28T02:27:25.754Z] INFO: HTTP Request
+[2025-09-28T02:27:25.766Z] INFO: HTTP Request
+[2025-09-28T02:27:25.776Z] WARN: HTTP Request
+[2025-09-28T02:27:25.784Z] WARN: HTTP Request
+[2025-09-28T02:27:25.795Z] ERROR: Failed to create meeting 
+Invalid `prisma.meeting.create()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:42
+
+  101 } = req.body;
+  102 
+  103 // Create the meeting
+→ 104 const meeting = await prisma.meeting.create({
+        data: {
+          title: "API Test Meeting",
+          description: "Testing meeting creation via API",
+          organizerId: undefined,
+          preferredStartTime: null,
+          preferredEndTime: null,
+          priority: "medium",
+          status: "PENDING",
+      +   durationMinutes: Int
+        }
+      })
+
+Argument `durationMinutes` is missing.
+PrismaClientValidationError: 
+Invalid `prisma.meeting.create()` invocation in
+/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:42
+
+  101 } = req.body;
+  102 
+  103 // Create the meeting
+→ 104 const meeting = await prisma.meeting.create({
+        data: {
+          title: "API Test Meeting",
+          description: "Testing meeting creation via API",
+          organizerId: undefined,
+          preferredStartTime: null,
+          preferredEndTime: null,
+          priority: "medium",
+          status: "PENDING",
+      +   durationMinutes: Int
+        }
+      })
+
+Argument `durationMinutes` is missing.
+    at wn (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/meetings.ts:104:21)
+[2025-09-28T02:27:25.796Z] WARN: HTTP Request
+[2025-09-28T02:27:25.805Z] WARN: HTTP Request
+[2025-09-28T02:27:52.254Z] INFO: Shutting down gracefully...
+[2025-09-28T02:27:53.910Z] INFO: Database connected successfully
+[2025-09-28T02:27:53.915Z] INFO: Server running on port 3002
+[2025-09-28T02:27:53.915Z] INFO: Environment: development
+[2025-09-28T02:28:18.132Z] INFO: Shutting down gracefully...
+[2025-09-28T02:28:19.587Z] INFO: Database connected successfully
+[2025-09-28T02:28:19.592Z] INFO: Server running on port 3002
+[2025-09-28T02:28:19.592Z] INFO: Environment: development
+[2025-09-28T02:28:30.978Z] INFO: Shutting down gracefully...
+[2025-09-28T02:28:32.040Z] INFO: Database connected successfully
+[2025-09-28T02:28:32.045Z] INFO: Server running on port 3002
+[2025-09-28T02:28:32.045Z] INFO: Environment: development
+[2025-09-28T02:28:37.701Z] INFO: Shutting down gracefully...
+[2025-09-28T02:28:38.911Z] INFO: Database connected successfully
+[2025-09-28T02:28:38.917Z] INFO: Server running on port 3002
+[2025-09-28T02:28:38.917Z] INFO: Environment: development
+[2025-09-28T02:28:59.392Z] INFO: Shutting down gracefully...
+[2025-09-28T02:29:00.790Z] INFO: Database connected successfully
+[2025-09-28T02:29:00.795Z] INFO: Server running on port 3002
+[2025-09-28T02:29:00.796Z] INFO: Environment: development
+[2025-09-28T02:34:39.097Z] INFO: HTTP Request
+[2025-09-28T02:34:39.113Z] INFO: HTTP Request
+[2025-09-28T02:34:39.130Z] INFO: HTTP Request
+[2025-09-28T02:34:39.146Z] INFO: HTTP Request
+[2025-09-28T02:34:39.174Z] INFO: Processing voice input via /process endpoint
+[2025-09-28T02:34:39.420Z] ERROR: Gemini API call failed [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+Error: [400 Bad Request] API key not valid. Please pass a valid API key. [{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]
+    at makeRequest (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@google/generative-ai/dist/index.js:212:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async generateContent (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/node_modules/@google/generative-ai/dist/index.js:536:22)
+    at GeminiService.extractMeetingDetails (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/services/geminiService.ts:83:22)
+    at <anonymous> (/mnt/686c9079-54d3-48e6-b3f8-474d3f6d2175/MHacks/MHacks2025/backend/src/routes/voice.ts:352:30)
+[2025-09-28T02:34:39.437Z] INFO: HTTP Request
+[2025-09-28T02:34:39.483Z] INFO: Meeting created
+[2025-09-28T02:34:39.489Z] INFO: HTTP Request
+[2025-09-28T02:34:39.506Z] INFO: Starting new negotiation session
+[2025-09-28T02:34:39.507Z] INFO: Starting meeting negotiation
+[2025-09-28T02:34:39.524Z] INFO: HTTP Request
+[2025-09-28T02:35:44.381Z] INFO: Shutting down gracefully...
+[2025-09-28T02:35:45.450Z] WARN: Gemini API key not configured. Running in mock mode.
+[2025-09-28T02:35:46.003Z] INFO: Database connected successfully
+[2025-09-28T02:35:46.017Z] INFO: Server running on port 3002
+[2025-09-28T02:35:46.018Z] INFO: Environment: development
+[2025-09-28T02:36:02.278Z] INFO: Shutting down gracefully...
+[2025-09-28T02:36:03.122Z] WARN: Gemini API key not configured. Running in mock mode.
+[2025-09-28T02:36:03.462Z] INFO: Database connected successfully
+[2025-09-28T02:36:03.467Z] INFO: Server running on port 3002
+[2025-09-28T02:36:03.468Z] INFO: Environment: development
+[2025-09-28T02:36:30.436Z] INFO: Shutting down gracefully...
+[2025-09-28T02:36:31.524Z] WARN: Gemini API key not configured. Running in mock mode.
+[2025-09-28T02:36:31.941Z] INFO: Database connected successfully
+[2025-09-28T02:36:31.944Z] INFO: Server running on port 3002
+[2025-09-28T02:36:31.945Z] INFO: Environment: development
+[2025-09-28T02:36:45.058Z] INFO: Shutting down gracefully...
+[2025-09-28T02:36:46.087Z] WARN: Gemini API key not configured. Running in mock mode.
+[2025-09-28T02:36:46.526Z] INFO: Database connected successfully
+[2025-09-28T02:36:46.532Z] INFO: Server running on port 3002
+[2025-09-28T02:36:46.532Z] INFO: Environment: development
+[2025-09-28T02:37:49.044Z] INFO: Processing voice input via /process endpoint
+[2025-09-28T02:37:49.073Z] INFO: HTTP Request
+[2025-09-28T02:42:15.637Z] INFO: Processing voice input via /process endpoint
+[2025-09-28T02:42:15.688Z] INFO: HTTP Request
+[2025-09-28T02:43:53.871Z] INFO: HTTP Request
+[2025-09-28T02:43:53.885Z] INFO: HTTP Request
+[2025-09-28T02:43:53.896Z] INFO: HTTP Request
+[2025-09-28T02:43:53.910Z] INFO: HTTP Request
+[2025-09-28T02:43:53.923Z] INFO: Processing voice input via /process endpoint
+[2025-09-28T02:43:53.936Z] INFO: HTTP Request
+[2025-09-28T02:43:53.960Z] INFO: Meeting created
+[2025-09-28T02:43:53.961Z] INFO: HTTP Request
+[2025-09-28T02:43:53.972Z] INFO: Starting new negotiation session
+[2025-09-28T02:43:53.973Z] INFO: Starting meeting negotiation
+[2025-09-28T02:43:53.984Z] INFO: HTTP Request
+[2025-09-28T02:44:28.945Z] INFO: HTTP Request
+[2025-09-28T02:44:28.956Z] INFO: HTTP Request
+[2025-09-28T02:44:28.966Z] INFO: HTTP Request
+[2025-09-28T02:44:28.979Z] INFO: HTTP Request
+[2025-09-28T02:44:28.989Z] INFO: Processing voice input via /process endpoint
+[2025-09-28T02:44:29.003Z] INFO: HTTP Request
+[2025-09-28T02:44:29.025Z] INFO: Meeting created
+[2025-09-28T02:44:29.026Z] INFO: HTTP Request
+[2025-09-28T02:44:29.036Z] INFO: Starting new negotiation session
+[2025-09-28T02:44:29.036Z] INFO: Starting meeting negotiation
+[2025-09-28T02:44:29.043Z] INFO: HTTP Request
