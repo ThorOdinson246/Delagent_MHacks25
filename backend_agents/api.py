@@ -28,10 +28,12 @@ load_dotenv()
 # Add agent directories to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '@agent1_pappu'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '@agent2_alice'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '@agent3_charlie'))
 
 # Agent addresses
 PAPPU_AGENT_ADDRESS = "agent1qfy2twzrw6ne43eufnzadxj0s3xpzlwd7vrgde5yrq46043kp8hpzpx6x75"  # Pappu's agent
 ALICE_AGENT_ADDRESS = "agent1qge95a5nqwjqgg0td05y9866jtjac7zf6g3908qjs330lm07kz8s799w9s8"  # Alice's agent
+CHARLIE_AGENT_ADDRESS = "agent1qge95a5nqwjqgg0td05y9866jtjac7zf6g3908qjs330lm07kz8s799w9s9"  # Charlie's agent
 
 # Pydantic models for API
 class MeetingRequest(BaseModel):
@@ -139,7 +141,7 @@ class APINegotiation:
             return await self.find_external_meeting_slots_api(preferred_datetime, duration)
     
     async def negotiate_with_ai_agent_api(self, preferred_datetime: datetime, duration: int) -> List[Dict[str, Any]]:
-        """AI Agent negotiation between Pappu and Alice (API version)"""
+        """3-Agent AI negotiation between Pappu, Alice, and Charlie (API version)"""
         # Search window: 5 days before and after preferred date for better negotiation
         # But ensure we don't search before today or beyond database range
         today = datetime.now().date()
@@ -169,27 +171,30 @@ class APINegotiation:
                     if test_end.hour >= 17:
                         continue
                     
-                    # Check availability for both users
+                    # Check availability for all three users
                     pappu_conflicts = await self.calendar_service.check_time_conflict("bob", test_start, test_end)
                     alice_conflicts = await self.calendar_service.check_time_conflict("alice", test_start, test_end)
+                    charlie_conflicts = await self.calendar_service.check_time_conflict("charlie", test_start, test_end)
                     
-                    # Be more lenient - allow slots if conflicts are low priority or moveable
+                    # Analyze conflicts for each agent with their personality
                     pappu_has_conflict = any(not conflict.get('is_moveable', False) and conflict.get('priority', 5) >= 7 for conflict in pappu_conflicts)
-                    alice_has_conflict = any(not conflict.get('is_moveable', False) and conflict.get('priority', 5) >= 7 for conflict in alice_conflicts)
+                    alice_has_conflict = any(not conflict.get('is_moveable', False) and conflict.get('priority', 5) >= 8 for conflict in alice_conflicts)  # Alice is stricter
+                    charlie_has_conflict = any(not conflict.get('is_moveable', False) and conflict.get('priority', 5) >= 6 for conflict in charlie_conflicts)  # Charlie is strategic
                     
-                    if not pappu_has_conflict and not alice_has_conflict:
-                        # Calculate quality score
-                        quality_score = self.calculate_slot_quality(test_start, preferred_datetime)
-                        
-                        # Reduce quality score if there are any conflicts (even low priority ones)
-                        if pappu_conflicts or alice_conflicts:
-                            quality_score = max(10, quality_score - 20)
+                    if not pappu_has_conflict and not alice_has_conflict and not charlie_has_conflict:
+                        # Calculate quality score with 3-agent considerations
+                        quality_score = self.calculate_3agent_slot_quality(test_start, preferred_datetime, pappu_conflicts, alice_conflicts, charlie_conflicts)
                         
                         available_slots.append({
                             "start_time": test_start,
                             "end_time": test_end,
                             "quality_score": quality_score,
-                            "duration_minutes": duration
+                            "duration_minutes": duration,
+                            "agent_reasoning": {
+                                "pappu": self.generate_pappu_reasoning(test_start, pappu_conflicts),
+                                "alice": self.generate_alice_reasoning(test_start, alice_conflicts),
+                                "charlie": self.generate_charlie_reasoning(test_start, charlie_conflicts)
+                            }
                         })
             
             current_date += timedelta(days=1)
@@ -201,7 +206,7 @@ class APINegotiation:
         for i, slot in enumerate(available_slots[:3]):
             slot["explanation"] = await self.generate_slot_explanation(slot, preferred_datetime, i)
         
-        return available_slots[:3]  # Return top 3 options for AI agent negotiation
+        return available_slots[:3]  # Return top 3 options for 3-agent negotiation
     
     async def find_external_meeting_slots_api(self, preferred_datetime: datetime, duration: int) -> List[Dict[str, Any]]:
         """Find slots for external meetings (only Pappu's schedule) - API version"""
@@ -292,6 +297,83 @@ class APINegotiation:
             score += 3
         
         return score
+    
+    def calculate_3agent_slot_quality(self, slot_time: datetime, preferred_time: datetime, 
+                                    pappu_conflicts: List, alice_conflicts: List, charlie_conflicts: List) -> int:
+        """Calculate quality score considering all three agents' preferences"""
+        base_score = self.calculate_slot_quality(slot_time, preferred_time)
+        
+        # Agent-specific bonuses/penalties
+        agent_adjustments = 0
+        
+        # Pappu (Bob) - Collaborative, flexible
+        if pappu_conflicts:
+            agent_adjustments -= 5  # Small penalty for conflicts
+        if 9 <= slot_time.hour <= 11 or 14 <= slot_time.hour <= 16:
+            agent_adjustments += 3  # Likes standard meeting times
+        
+        # Alice - Focused, protective of deep work
+        if alice_conflicts:
+            agent_adjustments -= 15  # Heavy penalty for conflicts
+        if slot_time.hour in [10, 11, 14, 15]:  # Prefers specific hours
+            agent_adjustments += 5
+        if any('focus' in str(conflict.get('block_type', '')).lower() for conflict in alice_conflicts):
+            agent_adjustments -= 25  # Severe penalty for focus time conflicts
+        
+        # Charlie - Strategic, efficiency-focused
+        if charlie_conflicts:
+            agent_adjustments -= 8  # Moderate penalty
+        if slot_time.minute == 0:  # Charlie loves round hours
+            agent_adjustments += 8
+        if 9 <= slot_time.hour <= 11 or 14 <= slot_time.hour <= 16:  # Strategic time blocks
+            agent_adjustments += 6
+        if slot_time.weekday() in [1, 2, 3]:  # Tuesday-Thursday (Charlie's peak)
+            agent_adjustments += 4
+        
+        return max(0, base_score + agent_adjustments)
+    
+    def generate_pappu_reasoning(self, slot_time: datetime, conflicts: List) -> str:
+        """Generate Pappu's (Bob's) collaborative reasoning"""
+        if not conflicts:
+            return f"Perfect! {slot_time.strftime('%I:%M %p')} works great for my collaborative schedule. No conflicts and good for team coordination."
+        
+        flexible_conflicts = [c for c in conflicts if c.get('is_moveable', False)]
+        if flexible_conflicts:
+            return f"I have {len(flexible_conflicts)} flexible items at {slot_time.strftime('%I:%M %p')} that I can easily reschedule. Team meeting takes priority!"
+        
+        return f"Some conflicts at {slot_time.strftime('%I:%M %p')}, but I'm willing to work around them for the team."
+    
+    def generate_alice_reasoning(self, slot_time: datetime, conflicts: List) -> str:
+        """Generate Alice's focused reasoning"""
+        if not conflicts:
+            if 10 <= slot_time.hour <= 11 or 14 <= slot_time.hour <= 15:
+                return f"Excellent choice! {slot_time.strftime('%I:%M %p')} is in my optimal meeting window. No disruption to my focus blocks."
+            return f"{slot_time.strftime('%I:%M %p')} is available, though not my preferred time. I can accommodate this."
+        
+        focus_conflicts = [c for c in conflicts if 'focus' in str(c.get('block_type', '')).lower()]
+        if focus_conflicts:
+            return f"⚠️ {slot_time.strftime('%I:%M %p')} conflicts with my deep work session. This would significantly impact my productivity."
+        
+        return f"I have some commitments at {slot_time.strftime('%I:%M %p')}, but they're not critical focus time. I can manage."
+    
+    def generate_charlie_reasoning(self, slot_time: datetime, conflicts: List) -> str:
+        """Generate Charlie's strategic reasoning"""
+        if not conflicts:
+            efficiency_score = ""
+            if slot_time.minute == 0:
+                efficiency_score += "Clean hour boundary ✓ "
+            if 9 <= slot_time.hour <= 11:
+                efficiency_score += "Morning efficiency block ✓ "
+            elif 14 <= slot_time.hour <= 16:
+                efficiency_score += "Afternoon productivity window ✓ "
+            
+            return f"Strategic analysis: {slot_time.strftime('%I:%M %p')} is optimal. {efficiency_score}Maximum team efficiency achieved."
+        
+        strategic_conflicts = [c for c in conflicts if c.get('priority', 5) >= 7]
+        if strategic_conflicts:
+            return f"Analyzing {slot_time.strftime('%I:%M %p')}: High-priority conflicts detected. Recommend alternative for operational efficiency."
+        
+        return f"Acceptable compromise at {slot_time.strftime('%I:%M %p')}. Minor scheduling adjustments needed, but overall efficiency maintained."
     
     async def generate_slot_explanation(self, slot: Dict[str, Any], preferred_datetime: datetime, slot_index: int) -> str:
         """Generate dynamic explanation using Gemini AI while maintaining privacy"""
@@ -632,25 +714,69 @@ async def negotiate_meeting(request: MeetingRequest):
             }))
             raise HTTPException(status_code=400, detail=error_message)
         
-        # Send agent communication message
+        # Send detailed 3-agent communication messages
         if request.is_ai_agent_meeting:
+            # Alice's initial response
             await manager.broadcast(json.dumps({
                 "type": "agent_reasoning",
                 "agent": "Alice's Agent",
-                "message": "🤖 Alice's Agent responding to meeting request",
-                "reasoning": "Analyzing my focus blocks and existing commitments to find optimal times",
+                "message": "🎯 Alice's Agent: Analyzing request with focus-time protection",
+                "reasoning": "Scanning my deep work blocks and focus sessions. I need to protect my productivity windows while finding collaborative opportunities.",
                 "timestamp": datetime.now().isoformat()
             }))
             
             # Simulate negotiation delay
             import asyncio
+            await asyncio.sleep(0.8)
+            
+            # Charlie's strategic analysis
+            await manager.broadcast(json.dumps({
+                "type": "agent_reasoning",
+                "agent": "Charlie's Agent",
+                "message": "📊 Charlie's Agent: Conducting strategic scheduling analysis",
+                "reasoning": "Evaluating operational efficiency metrics. Analyzing team productivity windows and optimal meeting batching opportunities.",
+                "timestamp": datetime.now().isoformat()
+            }))
+            
+            await asyncio.sleep(0.8)
+            
+            # Pappu's collaborative response
+            await manager.broadcast(json.dumps({
+                "type": "agent_reasoning",
+                "agent": "Pappu's Agent",
+                "message": "🤝 Pappu's Agent: Coordinating 3-way negotiation",
+                "reasoning": "Balancing team needs with individual preferences. Looking for win-win solutions that work for everyone's schedule.",
+                "timestamp": datetime.now().isoformat()
+            }))
+            
             await asyncio.sleep(1)
+            
+            # Multi-agent discussion simulation
+            await manager.broadcast(json.dumps({
+                "type": "agent_reasoning",
+                "agent": "Alice's Agent",
+                "message": "💭 Alice: Evaluating proposed time slots",
+                "reasoning": "Checking each option against my focus time requirements. Some slots would disrupt deep work, others look promising.",
+                "timestamp": datetime.now().isoformat()
+            }))
+            
+            await asyncio.sleep(0.6)
+            
+            await manager.broadcast(json.dumps({
+                "type": "agent_reasoning",
+                "agent": "Charlie's Agent",
+                "message": "⚡ Charlie: Optimizing for maximum efficiency",
+                "reasoning": "Cross-referencing all schedules for peak productivity alignment. Calculating efficiency scores for each potential slot.",
+                "timestamp": datetime.now().isoformat()
+            }))
+            
+            await asyncio.sleep(0.6)
             
             await manager.broadcast(json.dumps({
                 "type": "agent_reasoning",
                 "agent": "Pappu's Agent",
-                "message": "🔄 Negotiating with Alice's Agent",
-                "reasoning": "Comparing calendar conflicts and finding mutually beneficial time slots",
+                "message": "🔄 Pappu: Synthesizing team preferences",
+                "reasoning": "Weighing Alice's focus needs against Charlie's efficiency requirements. Finding the optimal compromise for team success.",
                 "timestamp": datetime.now().isoformat()
             }))
         else:
@@ -710,12 +836,32 @@ async def negotiate_meeting(request: MeetingRequest):
         
         formatted_slots = negotiation.format_slots_for_api(available_slots)
         
-        # Send final reasoning before results
+        # Send final consensus messages
+        await manager.broadcast(json.dumps({
+            "type": "agent_reasoning",
+            "agent": "Charlie's Agent",
+            "message": "🎯 Charlie: Final efficiency analysis complete",
+            "reasoning": f"Consensus achieved! Identified {len(formatted_slots)} optimal slots that maximize team productivity while respecting individual constraints.",
+            "timestamp": datetime.now().isoformat()
+        }))
+        
+        await asyncio.sleep(0.5)
+        
         await manager.broadcast(json.dumps({
             "type": "agent_reasoning",
             "agent": "Alice's Agent",
-            "message": "✅ Agreement reached on optimal time slots",
-            "reasoning": f"Found {len(formatted_slots)} mutually acceptable meeting times that work for both schedules",
+            "message": "✅ Alice: Agreement reached with focus-time protection",
+            "reasoning": f"Confirmed {len(formatted_slots)} slots that preserve my deep work sessions while enabling team collaboration.",
+            "timestamp": datetime.now().isoformat()
+        }))
+        
+        await asyncio.sleep(0.5)
+        
+        await manager.broadcast(json.dumps({
+            "type": "agent_reasoning",
+            "agent": "Pappu's Agent",
+            "message": "🤝 Pappu: 3-agent negotiation successful!",
+            "reasoning": f"Successfully balanced all three perspectives to find {len(formatted_slots)} win-win meeting opportunities.",
             "timestamp": datetime.now().isoformat()
         }))
         

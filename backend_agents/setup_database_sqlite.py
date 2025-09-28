@@ -241,6 +241,81 @@ def generate_bob_daily_schedule(date, day_offset):
     
     return blocks
 
+def generate_charlie_daily_schedule(date, day_offset):
+    """Generate realistic daily schedule for Charlie (strategic operations manager)"""
+    blocks = []
+    base_id = f"charlie_{day_offset}_"
+    
+    # Charlie's strategic schedule patterns - efficiency focused
+    morning_start = 9  # Charlie always starts at 9 AM for consistency
+    
+    # Strategic planning block (Charlie's signature morning routine)
+    blocks.append((
+        f"{base_id}1", "charlie", "Strategic Planning & Review",
+        date.replace(hour=morning_start, minute=0, second=0, microsecond=0),
+        date.replace(hour=morning_start + 1, minute=30, second=0, microsecond=0),
+        "focus_time", 8, False
+    ))
+    
+    # Operational meetings (Charlie batches meetings efficiently)
+    meeting_start = morning_start + 2  # 11 AM
+    if random.random() < 0.7:  # 70% chance of operational meetings
+        meeting_types = ["Operations Review", "Team Coordination", "Process Optimization", "Resource Planning", "Performance Analysis"]
+        meeting_type = random.choice(meeting_types)
+        blocks.append((
+            f"{base_id}2", "charlie", meeting_type,
+            date.replace(hour=meeting_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=meeting_start + 1, minute=0, second=0, microsecond=0),
+            "busy", 7, False
+        ))
+    
+    # Protected lunch hour (Charlie is strict about lunch for productivity)
+    blocks.append((
+        f"{base_id}3", "charlie", "Lunch & Strategic Thinking",
+        date.replace(hour=12, minute=0, second=0, microsecond=0),
+        date.replace(hour=13, minute=0, second=0, microsecond=0),
+        "busy", 6, False
+    ))
+    
+    # Afternoon efficiency block
+    afternoon_start = 13
+    if random.random() < 0.8:  # 80% chance of afternoon work
+        afternoon_types = ["Process Improvement", "Team Development", "Strategic Analysis", "Operational Excellence"]
+        afternoon_type = random.choice(afternoon_types)
+        duration = random.choice([1, 1.5, 2])  # 1-2 hours
+        end_hour = afternoon_start + int(duration)
+        end_minute = int((duration % 1) * 60)
+        
+        blocks.append((
+            f"{base_id}4", "charlie", afternoon_type,
+            date.replace(hour=afternoon_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=end_hour, minute=end_minute, second=0, microsecond=0),
+            "focus_time", 7, False
+        ))
+        afternoon_start = end_hour + (1 if end_minute > 0 else 0)
+    
+    # Late afternoon collaboration (Charlie's flexible time)
+    if afternoon_start < 16 and random.random() < 0.6:  # 60% chance if time allows
+        collaboration_types = ["Cross-team Sync", "Stakeholder Update", "Innovation Session", "Mentoring"]
+        collaboration_type = random.choice(collaboration_types)
+        blocks.append((
+            f"{base_id}5", "charlie", collaboration_type,
+            date.replace(hour=afternoon_start, minute=0, second=0, microsecond=0),
+            date.replace(hour=min(afternoon_start + 1, 16), minute=0, second=0, microsecond=0),
+            "flexible", 5, True  # This is Charlie's only flexible block
+        ))
+    
+    # End-of-day wrap-up (Charlie likes to end efficiently)
+    if random.random() < 0.4:  # 40% chance of wrap-up session
+        blocks.append((
+            f"{base_id}6", "charlie", "Daily Wrap-up & Tomorrow's Planning",
+            date.replace(hour=16, minute=0, second=0, microsecond=0),
+            date.replace(hour=16, minute=30, second=0, microsecond=0),
+            "focus_time", 6, False
+        ))
+    
+    return blocks
+
 def setup_database():
     """Setup the SQLite database with schema and mock data"""
     print("🔧 Setting up SQLite database...")
@@ -320,15 +395,25 @@ def setup_database():
         
         print(f"✅ Bob's calendar created ({len(bob_calendar)} blocks) - collaborative personality")
         
+        # Insert Charlie's calendar blocks
+        for block_id, user_id, title, start_time, end_time, block_type, priority, is_moveable in charlie_calendar:
+            cursor.execute("""
+                INSERT INTO calendar_blocks (id, user_id, title, start_time, end_time, block_type, priority, is_moveable)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (block_id, user_id, title, start_time, end_time, block_type, priority, is_moveable))
+        
+        print(f"✅ Charlie's calendar created ({len(charlie_calendar)} blocks) - strategic personality")
+        
         conn.commit()
         conn.close()
         print("✅ Database setup completed successfully!")
         
         # Print summary
         print("\n📊 Database Summary:")
-        print("👤 Users: Alice (focused), Bob (collaborative)")
+        print("👤 Users: Alice (focused), Bob (collaborative), Charlie (strategic)")
         print("📅 Alice's Schedule: Heavy focus time, protective of deep work")
         print("📅 Bob's Schedule: More flexible, collaborative approach")
+        print("📅 Charlie's Schedule: Strategic efficiency, batched meetings")
         print("🤝 Test Meeting: Project Planning (90 min, initiated by Bob)")
         print(f"🗄️  Database Location: {DATABASE_PATH}")
         
