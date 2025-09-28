@@ -32,78 +32,69 @@ export async function extractMeetingIntent(transcript) {
     const tomorrowDay = tomorrow.toLocaleDateString("en-US", {weekday: 'long', timeZone: "America/New_York"});
     
     const prompt = `
-        You are an intelligent scheduling assistant. Your task is to extract meeting details from a user's voice command and format them into a specific JSON structure.
-        The user is located in New York, United States (Eastern Time).
-        The current date and time is ${dayName}, ${monthDay} at ${currentTime} EDT.
-        Today's date is ${currentDate}.
-        Tomorrow (${tomorrowDay}) is ${tomorrowDate}.
+        You are an expert meeting scheduler AI. Extract meeting details from voice input with EXTREME ACCURACY.
         
-        IMPORTANT: Only schedule meetings on weekdays (Monday-Friday). If the user requests "tomorrow" and tomorrow is a weekend, 
-        schedule for the next available weekday instead.
-
-        Analyze the following transcript: "${transcript}"
-
-        Extract the following information:
-        1.  "title": The title of the meeting.
-        2.  "preferred_date": The preferred date in "YYYY-MM-DD" format. Infer from terms like "today", "tomorrow", or specific dates.
-        3.  "preferred_time": The preferred time in "HH:MM" (24-hour) format.
-        4.  "duration_minutes": The duration of the meeting in minutes. Default to 60 if not specified.
-        5.  "specific_agent": If the user mentions meeting with a specific person (Alice, Bob, Charlie), extract their name. Otherwise, leave null for multi-agent scheduling.
-
-        Return ONLY the JSON object. Do not include any other text or markdown formatting.
-
-        Examples:
+        Current date: ${currentDate} (${dayName})
+        Current time: ${currentTime} EDT
+        Tomorrow: ${tomorrowDay}, ${tomorrowDate}
         
-        Transcript: "schedule a marketing sync for tomorrow at 2:30 pm for 45 minutes"
-        JSON Output:
+        User voice input: "${transcript}"
+        
+        CRITICAL INSTRUCTIONS:
+        1. Extract ONLY what the user EXPLICITLY said - NO DEFAULTS, NO ASSUMPTIONS
+        2. If ANY required information (time, date, or meeting purpose) is missing or unclear, return an error
+        3. Pay extreme attention to time parsing: "7 PM" = "19:00", "9 AM" = "09:00", "3:30 PM" = "15:30"
+        4. Parse dates accurately: "today" = ${currentDate}, "tomorrow" = ${tomorrowDate}
+        5. Extract meeting titles from context: "team meeting" = "Team meeting", "doctor appointment" = "Doctor appointment"
+        6. Only schedule on weekdays - if tomorrow is weekend, ask for clarification
+        
+        Return ONLY valid JSON in ONE of these formats:
+        
+        SUCCESS (when ALL information is clear):
         {
-            "title": "marketing sync",
-            "preferred_date": "${tomorrowDate}",
-            "preferred_time": "14:30",
-            "duration_minutes": 45,
-            "specific_agent": null
-        }
-        
-        Transcript: "set up a meeting with Alice tomorrow at 10am"
-        JSON Output:
-        {
-            "title": "meeting with Alice",
-            "preferred_date": "${tomorrowDate}",
-            "preferred_time": "10:00",
+            "success": true,
+            "title": "exact meeting title from user input",
+            "preferred_date": "YYYY-MM-DD",
+            "preferred_time": "HH:MM (24-hour format)",
             "duration_minutes": 60,
-            "specific_agent": "alice"
+            "specific_agent": "alice/bob/charlie or null"
         }
+        
+        ERROR (when information is missing/unclear):
+        {
+            "success": false,
+            "missing_info": ["time", "date", "title"],
+            "clarification_needed": "I need more details. Could you specify the [missing info] for your meeting?"
+        }
+        
+        TIME PARSING EXAMPLES:
+        - "7 PM" → "19:00"
+        - "6 a.m." → "06:00"
+        - "9 AM" → "09:00" 
+        - "3:30 PM" → "15:30"
+        - "10 o'clock" → "10:00" (assume AM unless context suggests PM)
+        - "noon" → "12:00"
+        
+        DATE PARSING EXAMPLES:
+        - "today" → ${currentDate}
+        - "tomorrow" → ${tomorrowDate}
+        - "October 12th" → "2025-10-12"
+        - "December 25" → "2025-12-25"
+        - "Jan 15th" → "2025-01-15"
+        
+        TITLE EXTRACTION EXAMPLES:
+        - "schedule a team meeting" → "Team meeting"
+        - "Doctor's appointments" → "Doctor's appointment"
+        - "book doctor appointment" → "Doctor appointment"  
+        - "meeting with Alice" → "Meeting with Alice"
+        - "standup" → "Standup meeting"
+        - just "schedule a meeting" → ERROR (ask what kind of meeting)
+        
+        DO NOT USE DEFAULTS. If unclear, ask for clarification.
     `;
 
     try {
-        // If using mock key, return a mock response
-        if (GEMINI_API_KEY === "mock_key_for_development") {
-            console.log("🔧 Using mock Gemini response for development");
-            
-            // Calculate next weekday for mock response
-            const nextWeekday = new Date(nyTime);
-            nextWeekday.setDate(nextWeekday.getDate() + 1);
-            while (nextWeekday.getDay() === 0 || nextWeekday.getDay() === 6) { // Skip weekends
-                nextWeekday.setDate(nextWeekday.getDate() + 1);
-            }
-            
-            // Extract specific agent from transcript
-            const lowerTranscript = transcript.toLowerCase();
-            let specificAgent = null;
-            if (lowerTranscript.includes("alice")) specificAgent = "alice";
-            else if (lowerTranscript.includes("bob")) specificAgent = "bob";
-            else if (lowerTranscript.includes("charlie")) specificAgent = "charlie";
-
-            return {
-                title: transcript.includes("doctor") || transcript.includes("appointment") ? 
-                       (transcript.includes("doctor") ? "Doctor's appointment" : "appointment") :
-                       transcript.includes("meeting") ? "meeting" : "Meeting from Voice",
-                preferred_date: nextWeekday.toISOString().split('T')[0],
-                preferred_time: transcript.includes("9") ? "09:00" : "14:00",
-                duration_minutes: 60,
-                specific_agent: specificAgent
-            };
-        }
+        // Use REAL Gemini API - no more mock parsing!
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
@@ -171,29 +162,7 @@ export async function generateSpokenResponse(negotiationResult) {
     `;
 
     try {
-        // If using mock key, return a mock response
-        if (GEMINI_API_KEY === "mock_key_for_development") {
-            console.log("🔧 Using mock spoken response for development");
-            if (negotiationResult.success && negotiationResult.available_slots?.length > 0) {
-                const firstSlot = negotiationResult.available_slots[0];
-                const meetingTitle = negotiationResult.meeting_request?.title || "meeting";
-                const requestedTime = negotiationResult.meeting_request?.preferred_time || "requested time";
-                
-                // Check if the suggested time matches the requested time
-                const isExactMatch = firstSlot.time_formatted === requestedTime;
-                
-                if (isExactMatch) {
-                    return `Perfect! I scheduled your ${meetingTitle} for ${firstSlot.day_of_week}, ${firstSlot.date_formatted} at ${firstSlot.time_formatted} as requested. All agents are available at this time.`;
-                } else {
-                    return `I found an excellent time for your ${meetingTitle}. Your requested ${requestedTime} slot had some scheduling conflicts, but ${firstSlot.day_of_week}, ${firstSlot.date_formatted} at ${firstSlot.time_formatted} works perfectly and avoids any issues.`;
-                }
-            } else {
-                const meetingTitle = negotiationResult.meeting_request?.title || "meeting";
-                const requestedDate = negotiationResult.meeting_request?.preferred_date || "requested date";
-                const requestedTime = negotiationResult.meeting_request?.preferred_time || "requested time";
-                return `Unfortunately, your requested time for the ${meetingTitle} on ${requestedDate} at ${requestedTime} has conflicts with existing commitments. Let me suggest some alternative times that work better for everyone.`;
-            }
-        }
+        // Use REAL Gemini API for spoken responses - no more mock!
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
@@ -201,13 +170,23 @@ export async function generateSpokenResponse(negotiationResult) {
     } catch (error) {
         console.error("Error generating spoken response from Gemini:", error);
         
-        // Fallback to mock response if API fails
-        console.log("🔧 Falling back to mock spoken response due to API error");
+        // Fallback to real data-based response if Gemini API fails
+        console.log("🔧 Using real data for spoken response due to API error");
         if (negotiationResult.success && negotiationResult.available_slots?.length > 0) {
-            const firstSlot = negotiationResult.available_slots[0];
-            return `I found an available slot for your meeting on ${firstSlot.day_of_week} at ${firstSlot.time_formatted}. Would you like me to schedule it?`;
+            const slots = negotiationResult.available_slots;
+            const bestSlot = slots[0]; // Get the highest quality slot
+            
+            if (slots.length === 1) {
+                return `Great! I found a perfect time slot for your "${negotiationResult.meeting_request?.title || 'meeting'}" on ${bestSlot.day_of_week}, ${bestSlot.date_formatted} at ${bestSlot.time_formatted}. This slot has a quality score of ${bestSlot.quality_score} out of 100. ${bestSlot.explanation} Would you like me to schedule it?`;
+            } else {
+                const alternatives = slots.slice(1, 3).map(slot => 
+                    `${slot.day_of_week} at ${slot.time_formatted}`
+                ).join(' or ');
+                return `Perfect! I found ${slots.length} available time slots for your "${negotiationResult.meeting_request?.title || 'meeting'}". The best option is ${bestSlot.day_of_week}, ${bestSlot.date_formatted} at ${bestSlot.time_formatted} with a quality score of ${bestSlot.quality_score}. ${bestSlot.explanation} I also found alternatives on ${alternatives}. Would you like me to book the first option?`;
+            }
         } else {
-            return "I couldn't find any available times for that request. Would you like to try another day or time?";
+            const searchWindow = negotiationResult.search_window;
+            return `I searched for available times between ${new Date(searchWindow?.start).toLocaleDateString()} and ${new Date(searchWindow?.end).toLocaleDateString()} but couldn't find any slots that work for everyone. Would you like to try a different date range or time?`;
         }
     }
 }

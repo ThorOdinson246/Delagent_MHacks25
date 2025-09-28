@@ -213,22 +213,46 @@ router.post('/voice-command', validateConfig, async (req, res) => {
             const meetingDetailsJSON = await extractMeetingIntent(transcript);
             console.log('[Node Backend] Step 2: Extracted meeting details from transcript:', meetingDetailsJSON);
             
-            // Generate fake agent interactions for impressive demo
-            console.log('[Node Backend] Step 2.5: Generating fake agent interactions...');
-            const fakeInteractions = await generateFakeAgentInteractions(transcript, meetingDetailsJSON);
-            
-            // Broadcast fake agent interactions to frontend with staggered delays for realism
-            const io = req.app.get('io');
-            if (io && fakeInteractions.length > 0) {
-                // Start broadcasting after a short delay to let the voice processing begin
-                setTimeout(() => {
-                    for (let i = 0; i < fakeInteractions.length; i++) {
-                        setTimeout(() => {
-                            io.emit('agent-interaction', fakeInteractions[i]);
-                            console.log(`[Node Backend] Broadcasted fake interaction ${i + 1}:`, fakeInteractions[i].message);
-                        }, i * 1500); // 1.5 second delay between each interaction for better visual effect
+            // Handle clarification requests
+            if (!meetingDetailsJSON.success) {
+                console.log('[Node Backend] Step 2.1: Missing information, requesting clarification...');
+                return res.json({
+                    success: false,
+                    spokenResponse: meetingDetailsJSON.clarification_needed,
+                    context: {
+                        originalRequest: { transcript, action, context },
+                        missingInfo: meetingDetailsJSON.missing_info
                     }
-                }, 1000); // Initial 1 second delay before starting
+                });
+            }
+            
+            // Broadcast real-time agent status updates
+            console.log('[Node Backend] Step 2.5: Broadcasting real agent negotiation status...');
+            const io = req.app.get('io');
+            if (io) {
+                // Send initial processing status
+                setTimeout(() => {
+                    io.emit('agent-interaction', {
+                        type: 'agent_status',
+                        agent: 'System',
+                        message: 'Analyzing meeting request...',
+                        reasoning: `Processing request for "${meetingDetailsJSON.title}" on ${meetingDetailsJSON.preferred_date}`,
+                        confidence: 95,
+                        timestamp: new Date().toISOString()
+                    });
+                }, 500);
+                
+                // Send agent negotiation status
+                setTimeout(() => {
+                    io.emit('agent-interaction', {
+                        type: 'agent_reasoning',
+                        agent: 'Multi-Agent System',
+                        message: 'Agents negotiating optimal time slot...',
+                        reasoning: 'Alice, Pappu, and Charlie agents are analyzing calendars and preferences to find the best meeting time.',
+                        confidence: 90,
+                        timestamp: new Date().toISOString()
+                    });
+                }, 1500);
             }
             
             // --- PYTHON BACKEND CALL ---
@@ -240,11 +264,73 @@ router.post('/voice-command', validateConfig, async (req, res) => {
             });
             
             if (!pythonResponse.ok) {
-                throw new Error(`Python backend error: ${pythonResponse.status} ${pythonResponse.statusText}`);
+                const errorText = await pythonResponse.text();
+                console.log(`[Node Backend] Python backend error details:`, errorText);
+                
+                // Handle business hours restriction intelligently
+                if (errorText.includes('Time must be between 08:00 and 17:00')) {
+                    console.log(`[Node Backend] Requested time ${meetingDetailsJSON.preferred_time} is outside business hours. Suggesting alternatives...`);
+                    
+                    // Create a helpful response for after-hours requests
+                    const requestedHour = parseInt(meetingDetailsJSON.preferred_time.split(':')[0]);
+                    const isEarlyMorning = requestedHour < 8;
+                    const isEvening = requestedHour >= 17;
+                    
+                    const alternativeTime = isEarlyMorning ? '09:00' : '16:00';
+                    const alternativeRequest = { ...meetingDetailsJSON, preferred_time: alternativeTime };
+                    
+                    // Try with business hours alternative
+                    const altResponse = await fetch('http://localhost:8000/negotiate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(alternativeRequest)
+                    });
+                    
+                    if (altResponse.ok) {
+                        var pythonResult = await altResponse.json();
+                        // Add context about the original request
+                        pythonResult.original_request_time = meetingDetailsJSON.preferred_time;
+                        pythonResult.business_hours_suggestion = true;
+                        
+                        // Continue with the alternative result
+                        console.log('[Node Backend] Step 4: Using business hours alternative:', pythonResult);
+                    } else {
+                        throw new Error(`Python backend error: ${pythonResponse.status} ${pythonResponse.statusText}`);
+                    }
+                } else {
+                    throw new Error(`Python backend error: ${pythonResponse.status} ${pythonResponse.statusText}`);
+                }
+            } else {
+                var pythonResult = await pythonResponse.json();
+                console.log('[Node Backend] Step 4: Received negotiation result from Python backend:', pythonResult);
             }
-            
-            const pythonResult = await pythonResponse.json();
-            console.log('[Node Backend] Step 4: Received negotiation result from Python backend:', pythonResult);
+
+            // Broadcast final agent result with real data
+            if (io) {
+                setTimeout(() => {
+                    if (pythonResult.success && pythonResult.available_slots?.length > 0) {
+                        const bestSlot = pythonResult.available_slots[0];
+                        io.emit('agent-interaction', {
+                            type: 'agent_success',
+                            agent: 'Agent Consensus',
+                            message: `Found ${pythonResult.available_slots.length} available slot${pythonResult.available_slots.length > 1 ? 's' : ''}`,
+                            reasoning: `Best option: ${bestSlot.day_of_week}, ${bestSlot.date_formatted} at ${bestSlot.time_formatted} (Quality Score: ${bestSlot.quality_score}/100). ${bestSlot.explanation}`,
+                            confidence: bestSlot.quality_score,
+                            timestamp: new Date().toISOString(),
+                            slots_found: pythonResult.available_slots.length
+                        });
+                    } else {
+                        io.emit('agent-interaction', {
+                            type: 'agent_failure',
+                            agent: 'Agent System',
+                            message: 'No available slots found',
+                            reasoning: `Searched ${pythonResult.total_slots_found || 0} potential slots but none met all requirements for the requested time.`,
+                            confidence: 85,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                }, 2500);
+            }
 
             // Step 2: Generate a natural language response from the Python backend's JSON output
             const spokenResponse = await generateSpokenResponse(pythonResult);
