@@ -667,8 +667,8 @@ async def get_meetings():
 async def get_user_calendar(user_id: str):
     """Get calendar blocks for a specific user"""
     try:
-        if user_id not in ['bob', 'alice']:
-            raise HTTPException(status_code=400, detail="User ID must be 'bob' or 'alice'")
+        if user_id not in ['bob', 'alice', 'charlie']:
+            raise HTTPException(status_code=400, detail="User ID must be 'bob', 'alice', or 'charlie'")
         
         blocks = await negotiation.calendar_service.get_user_calendar_blocks(user_id)
         
