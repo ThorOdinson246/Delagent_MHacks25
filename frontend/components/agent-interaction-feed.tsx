@@ -41,6 +41,14 @@ export function AgentInteractionFeed() {
           data.type === 'agent_error') {
         setIsActive(true)
         
+        // Clear old negotiations when a new one starts
+        if (data.type === 'agent_status' && 
+            (data.message?.includes('Analyzing meeting request') || 
+             data.message?.includes('Processing request'))) {
+          console.log('🧹 Clearing old negotiations - new negotiation starting')
+          setInteractions([])
+        }
+        
         // Create a content-based hash for better deduplication
         const contentHash = `${data.agent}-${data.message}-${data.type}`.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()
         
