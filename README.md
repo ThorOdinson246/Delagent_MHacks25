@@ -315,7 +315,7 @@ curl -X POST http://localhost:8000/negotiate_meeting \
 
 ---
 
-## 🏆 **Awards & Recognition**
+## 🏆 **Recognition**
 
 Built for **MHacks 2025** - showcasing the future of AI-powered scheduling with:
 - **Revolutionary voice interface** 
