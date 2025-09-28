@@ -500,7 +500,7 @@ class APINegotiation:
             {conflicts_info if conflicts_info else "No conflicts found"}
             
             Generate a natural, helpful explanation (1-2 sentences) that:
-            1. Explains why this time is suggested
+            1. Explains why this time is suggested, es[ecialy the time user wants doesnot matches the available time
             2. Maintains privacy (don't mention specific people or meeting titles)
             3. Is encouraging and professional
             4. Explains the reasoning without being too technical
@@ -509,6 +509,7 @@ class APINegotiation:
             - "This is your preferred time and it's available!"
             - "This time works well as it avoids existing commitments."
             - "This slot is available with minimal schedule conflicts."
+            - "This time was not available due to ... but these should work out."
             - "This alternative time fits well around current appointments."
             
             Generate explanation:

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Calendar, Clock, Users } from "lucide-react"
+import { RefreshCw, Calendar, Clock, Users, ChevronDown, ChevronUp } from "lucide-react"
 import { toast } from "sonner"
 
 interface CalendarBlock {
@@ -30,13 +30,15 @@ interface Meeting {
 
 interface RealTimeCalendarProps {
   userId?: string
+  isCollapsible?: boolean
 }
 
-export function RealTimeCalendar({ userId = "bob" }: RealTimeCalendarProps) {
+export function RealTimeCalendar({ userId = "bob", isCollapsible = false }: RealTimeCalendarProps) {
   const [calendarBlocks, setCalendarBlocks] = useState<CalendarBlock[]>([])
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [isCollapsed, setIsCollapsed] = useState(isCollapsible)
   
   const wsRef = useRef<WebSocket | null>(null)
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -171,11 +173,14 @@ export function RealTimeCalendar({ userId = "bob" }: RealTimeCalendarProps) {
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Calendar className="h-5 w-5" />
-              <span>Real-Time Calendar - {userId.charAt(0).toUpperCase() + userId.slice(1)}</span>
+              <span>{userId.charAt(0).toUpperCase() + userId.slice(1)}'s Calendar</span>
+              <Badge variant="secondary" className="text-xs">
+                {calendarBlocks.length} blocks, {meetingsArray.length} meetings
+              </Badge>
             </div>
             <div className="flex items-center space-x-2">
               <Badge variant="outline" className="text-xs">
-                Last updated: {lastUpdated.toLocaleTimeString()}
+                {lastUpdated.toLocaleTimeString()}
               </Badge>
               <Button
                 variant="outline"
@@ -188,11 +193,21 @@ export function RealTimeCalendar({ userId = "bob" }: RealTimeCalendarProps) {
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
               </Button>
+              {isCollapsible && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsCollapsed(!isCollapsed)}
+                >
+                  {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </Button>
+              )}
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
+        {!isCollapsed && (
+          <CardContent>
+            <div className="space-y-6">
             {/* Calendar Blocks */}
             <div>
               <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
@@ -299,8 +314,9 @@ export function RealTimeCalendar({ userId = "bob" }: RealTimeCalendarProps) {
                 </div>
               )}
             </div>
-          </div>
-        </CardContent>
+            </div>
+          </CardContent>
+        )}
       </Card>
     </div>
   )

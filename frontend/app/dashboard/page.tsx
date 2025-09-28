@@ -12,6 +12,10 @@ import { RealTimeCalendar } from "@/components/real-time-calendar"
 
 export default function DashboardPage() {
   const [showFullPageVoice, setShowFullPageVoice] = useState(true)
+  
+  // Current user is Bob (Pappu) - his calendar is available on the calendar page
+  const currentUser = "bob"
+  const otherAgents = ["alice", "charlie"]
 
   if (showFullPageVoice) {
     return <FullPageVoiceInterface onClose={() => setShowFullPageVoice(false)} />
@@ -32,9 +36,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
+        <div className="grid lg:grid-cols-3 gap-8">
           <VoiceInterface />
-          <AgentStatus />
+          <div className="lg:col-span-2">
+            <AgentStatus />
+          </div>
         </div>
 
         <RealTimeNegotiation onMeetingScheduled={(meetingId) => {
@@ -42,10 +48,10 @@ export default function DashboardPage() {
           // Refresh meeting dashboard
         }} />
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          <RealTimeCalendar userId="bob" />
-          <RealTimeCalendar userId="alice" />
-          <RealTimeCalendar userId="charlie" />
+        <div className="grid lg:grid-cols-2 gap-6">
+          {otherAgents.map(agent => (
+            <RealTimeCalendar key={agent} userId={agent} isCollapsible={true} />
+          ))}
         </div>
 
         <MeetingDashboard />
