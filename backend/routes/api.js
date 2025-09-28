@@ -200,7 +200,7 @@ const validateConfig = (req, res, next) => {
 
 // Main endpoint to handle the voice command processing flow
 router.post('/voice-command', validateConfig, async (req, res) => {
-    const { transcript, action, context } = req.body;
+    const { transcript, action, context, conversationContext } = req.body;
 
     if (!transcript) {
         return res.status(400).json({ error: 'Transcript is required.' });
@@ -210,7 +210,10 @@ router.post('/voice-command', validateConfig, async (req, res) => {
         if (action === 'schedule') {
             // Step 1: Extract meeting details from the initial command
             console.log(`[Node Backend] Step 1: Received transcript: "${transcript}"`);
-            const meetingDetailsJSON = await extractMeetingIntent(transcript);
+            if (conversationContext) {
+                console.log('[Node Backend] Step 1.5: Conversation context present - continuing conversation');
+            }
+            const meetingDetailsJSON = await extractMeetingIntent(transcript, conversationContext);
             console.log('[Node Backend] Step 2: Extracted meeting details from transcript:', meetingDetailsJSON);
             
             // Handle clarification requests

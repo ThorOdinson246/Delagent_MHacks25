@@ -28,6 +28,8 @@ export function VoiceInterface() {
   const [negotiationResult, setNegotiationResult] = useState<NegotiationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [conversationContext, setConversationContext] = useState<any>(null)
+  const [awaitingFollowup, setAwaitingFollowup] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [silenceCountdown, setSilenceCountdown] = useState(0)
@@ -107,11 +109,16 @@ export function VoiceInterface() {
       setProcessingStage("🎯 Processing voice command...")
       console.log("Sending transcript to voice orchestrator:", transcript)
       
+      // Add conversation context for follow-up questions
+      const contextualTranscript = awaitingFollowup && conversationContext
+        ? `${conversationContext.originalTranscript} ${transcript}`
+        : transcript
+      
       // Add a small delay to show the processing stage
       await new Promise(resolve => setTimeout(resolve, 500))
       
       setProcessingStage("🤖 AI agents negotiating...")
-      const result = await voiceService.processVoiceCommand(transcript, "schedule")
+      const result = await voiceService.processVoiceCommand(contextualTranscript, "schedule", conversationContext)
       
       console.log("Voice orchestrator response:", result)
       
@@ -125,6 +132,29 @@ export function VoiceInterface() {
       
       setProcessingStage("🗣️ Generating response...")
       
+      // Check if this is a follow-up needed response
+      const needsFollowup = result.context?.originalRequest?.success === false || 
+                           (result.context && 'missingInfo' in result.context)
+      
+      if (needsFollowup) {
+        console.log("🔄 Follow-up needed, storing conversation context")
+        setConversationContext({
+          originalTranscript: awaitingFollowup ? conversationContext?.originalTranscript : transcript,
+          currentTranscript: transcript,
+          missingInfo: result.context.missingInfo,
+          partialRequest: result.context.originalRequest,
+          conversationHistory: [
+            ...(conversationContext?.conversationHistory || []),
+            { transcript, response: result.voice_response, timestamp: new Date() }
+          ]
+        })
+        setAwaitingFollowup(true)
+      } else {
+        // Successful completion - clear context
+        setConversationContext(null)
+        setAwaitingFollowup(false)
+      }
+      
       // Speak the AI-generated response
       if (result.voice_response) {
         console.log("AI response:", result.voice_response)
@@ -135,17 +165,47 @@ export function VoiceInterface() {
               console.log("TTS completed")
               setProcessingStage("")
               setIsProcessing(false)
+              
+              // 🎯 AUTOMATIC FOLLOW-UP: Re-enable mic if we need more info
+              if (needsFollowup) {
+                console.log("🎤 Automatically re-enabling mic for follow-up...")
+                setTimeout(async () => {
+                  if (!isRecording && !isProcessing) {
+                    await startRecording()
+                  }
+                }, 1000) // Wait 1 second after TTS completes
+              }
             },
             onError: (error) => {
               console.error("TTS error:", error)
               setProcessingStage("")
               setIsProcessing(false)
+              
+              // Still enable follow-up even if TTS fails
+              if (needsFollowup) {
+                console.log("🎤 Re-enabling mic for follow-up (TTS failed)...")
+                setTimeout(async () => {
+                  if (!isRecording && !isProcessing) {
+                    await startRecording()
+                  }
+                }, 500)
+              }
             }
           })
         } else {
           console.log("TTS not available (server-side rendering)")
           setProcessingStage("")
           setIsProcessing(false)
+          
+          // Enable follow-up without TTS
+          if (needsFollowup) {
+            console.log("🎤 Re-enabling mic for follow-up (no TTS)...")
+            setTimeout(async () => {
+              if (!isRecording && !isProcessing) {
+                await startRecording()
+              }
+            }, 1000)
+          }
         }
       } else {
         setProcessingStage("")
@@ -241,38 +301,43 @@ export function VoiceInterface() {
     }
   }
 
+  const startRecording = async () => {
+    try {
+      setError(null)
+      setSilenceCountdown(0)
+      console.log("Checking permissions...")
+      
+      const hasPermission = await audioRecorderService.checkPermissions()
+      if (!hasPermission) {
+        setError("Microphone permission is required. Please allow microphone access.")
+        return false
+      }
+      
+      // Set up callbacks for auto-stop and audio levels
+      audioRecorderService.setAutoStopCallback(stopRecordingAndProcess)
+      audioRecorderService.setCountdownCallback(setSilenceCountdown)
+      audioRecorderService.setAudioLevelCallback(setAudioLevels)
+      
+      console.log("Starting recording...")
+      await audioRecorderService.startRecording()
+      setIsRecording(true)
+      setIsListening(false) // We're recording, not processing
+      return true
+    } catch (err) {
+      console.error("Failed to start recording:", err)
+      setError(err instanceof Error ? err.message : "Failed to start recording. Please check microphone permissions.")
+      setIsRecording(false)
+      setIsListening(false)
+      setSilenceCountdown(0)
+      return false
+    }
+  }
+
   const toggleListening = async () => {
     if (isRecording) {
       await stopRecordingAndProcess()
     } else {
-      // Start recording
-      try {
-        setError(null)
-        setSilenceCountdown(0)
-        console.log("Checking permissions...")
-        
-        const hasPermission = await audioRecorderService.checkPermissions()
-        if (!hasPermission) {
-          setError("Microphone permission is required. Please allow microphone access.")
-          return
-        }
-        
-        // Set up callbacks for auto-stop and audio levels
-        audioRecorderService.setAutoStopCallback(stopRecordingAndProcess)
-        audioRecorderService.setCountdownCallback(setSilenceCountdown)
-        audioRecorderService.setAudioLevelCallback(setAudioLevels)
-        
-        console.log("Starting recording...")
-        await audioRecorderService.startRecording()
-        setIsRecording(true)
-        setIsListening(false) // We're recording, not processing
-      } catch (err) {
-        console.error("Failed to start recording:", err)
-        setError(err instanceof Error ? err.message : "Failed to start recording. Please check microphone permissions.")
-        setIsRecording(false)
-        setIsListening(false)
-        setSilenceCountdown(0)
-      }
+      await startRecording()
     }
   }
 
@@ -339,6 +404,32 @@ export function VoiceInterface() {
           <Mic className="w-5 h-5 text-primary" />
           Voice Interface
         </CardTitle>
+        
+        {/* Conversation Context Indicator */}
+        {awaitingFollowup && conversationContext && (
+          <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2 text-amber-800 text-sm font-medium mb-1">
+              <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+              Continuing conversation...
+              {!isRecording && !isProcessing && (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full ml-auto">
+                  🎤 Auto-listening enabled
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-amber-700">
+              Missing: {conversationContext.missingInfo?.join(', ') || 'information'}
+            </div>
+            <div className="text-xs text-amber-600 mt-1 font-mono bg-amber-100/50 px-2 py-1 rounded">
+              "{conversationContext.originalTranscript?.substring(0, 60)}..."
+            </div>
+            {!isRecording && !isProcessing && (
+              <div className="text-xs text-amber-600 mt-2 italic">
+                💡 The mic will automatically start after I finish speaking
+              </div>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Voice Visualization */}

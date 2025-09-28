@@ -14,7 +14,7 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
  * @param {string} transcript - The user's voice command.
  * @returns {Promise<object>} - A JSON object matching the Python backend's MeetingRequest model.
  */
-export async function extractMeetingIntent(transcript) {
+export async function extractMeetingIntent(transcript, conversationContext = null) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" });
 
     // Get current date/time in New York timezone
@@ -31,12 +31,27 @@ export async function extractMeetingIntent(transcript) {
     const tomorrowDate = tomorrow.toISOString().split('T')[0];
     const tomorrowDay = tomorrow.toLocaleDateString("en-US", {weekday: 'long', timeZone: "America/New_York"});
     
+    // Build context-aware prompt
+    let contextInfo = "";
+    if (conversationContext) {
+        contextInfo = `
+        
+        CONVERSATION CONTEXT:
+        - Original request: "${conversationContext.originalTranscript || 'N/A'}"
+        - Missing information: ${conversationContext.missingInfo ? conversationContext.missingInfo.join(', ') : 'N/A'}
+        - Previous attempts: ${conversationContext.conversationHistory ? conversationContext.conversationHistory.length : 0}
+        
+        The user is now providing additional information to complete their meeting request.
+        Combine the original request with this new information.
+        `;
+    }
+
     const prompt = `
         You are an expert meeting scheduler AI. Extract meeting details from voice input with EXTREME ACCURACY.
         
         Current date: ${currentDate} (${dayName})
         Current time: ${currentTime} EDT
-        Tomorrow: ${tomorrowDay}, ${tomorrowDate}
+        Tomorrow: ${tomorrowDay}, ${tomorrowDate}${contextInfo}
         
         User voice input: "${transcript}"
         

@@ -26,9 +26,12 @@ class VoiceService {
       : 'http://localhost:3001';
   }
 
-  async processVoiceCommand(transcript: string, action: string = 'schedule'): Promise<VoiceServiceResponse> {
+  async processVoiceCommand(transcript: string, action: string = 'schedule', conversationContext?: any): Promise<VoiceServiceResponse> {
     try {
       console.log(`Processing voice command: "${transcript}" for action: ${action}`);
+      if (conversationContext) {
+        console.log('🔄 Including conversation context:', conversationContext);
+      }
       
       const response = await fetch(`${this.baseUrl}/api/voice-command`, {
         method: 'POST',
@@ -37,7 +40,8 @@ class VoiceService {
         },
         body: JSON.stringify({
           transcript,
-          action: 'schedule'
+          action: 'schedule',
+          conversationContext
         })
       });
 
