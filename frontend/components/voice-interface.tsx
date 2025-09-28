@@ -10,6 +10,8 @@ import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/a
 
 import { audioRecorderService } from "@/lib/audio-recorder-service"
 import { voiceService } from "@/lib/voice-service"
+import { ttsService } from "@/lib/tts-service"
+import { websocketService } from "@/lib/websocket-service"
 import { EnhancedAudioVisualizer } from "./enhanced-audio-visualizer"
 
 // Speech Recognition types are handled by the DOM lib
@@ -26,6 +28,7 @@ export function VoiceInterface() {
   const [negotiationResult, setNegotiationResult] = useState<NegotiationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [silenceCountdown, setSilenceCountdown] = useState(0)
   const [audioLevels, setAudioLevels] = useState<number[]>([])
@@ -33,6 +36,27 @@ export function VoiceInterface() {
   const recognition = useRef<any | null>(null)
 
   useEffect(() => {
+    // Initialize WebSocket connection
+    websocketService.connect();
+
+    // Set up WebSocket event listeners
+    const handleNegotiationUpdate = (event: CustomEvent) => {
+      console.log('Received negotiation update via WebSocket:', event.detail);
+      if (event.detail.data) {
+        setNegotiationResult(event.detail.data);
+      }
+    };
+
+    const handleSchedulingUpdate = (event: CustomEvent) => {
+      console.log('Received scheduling update via WebSocket:', event.detail);
+      if (event.detail.data) {
+        setNegotiationResult(event.detail.data);
+      }
+    };
+
+    window.addEventListener('negotiation-update', handleNegotiationUpdate as EventListener);
+    window.addEventListener('scheduling-update', handleSchedulingUpdate as EventListener);
+
     if (typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
       recognition.current = new SpeechRecognition()
@@ -63,6 +87,13 @@ export function VoiceInterface() {
         setIsListening(false)
       }
     }
+
+    // Cleanup function
+    return () => {
+      window.removeEventListener('negotiation-update', handleNegotiationUpdate as EventListener);
+      window.removeEventListener('scheduling-update', handleSchedulingUpdate as EventListener);
+      websocketService.disconnect();
+    };
   }, [])
 
   const handleVoiceOrchestration = async (transcript: string) => {
@@ -86,9 +117,17 @@ export function VoiceInterface() {
         setNegotiationResult(result.context.negotiationResult)
       }
       
-      // Log the AI-generated response (TTS functionality removed)
+      // Speak the AI-generated response
       if (result.spokenResponse) {
         console.log("AI response:", result.spokenResponse)
+        if (ttsService) {
+          ttsService.speak(result.spokenResponse, {
+            onEnd: () => console.log("TTS completed"),
+            onError: (error) => console.error("TTS error:", error)
+          })
+        } else {
+          console.log("TTS not available (server-side rendering)")
+        }
       }
       
     } catch (err) {
@@ -229,9 +268,13 @@ export function VoiceInterface() {
       setLoading(true)
       setError(null)
       const result = await apiService.scheduleMeeting(meetingRequest, slotIndex)
-      setNegotiationResult(result)
+      
       if (result.success) {
-        // Clear form after successful scheduling
+        // Show success message
+        setError(null)
+        setSuccessMessage("✅ Meeting scheduled successfully!")
+        
+        // Clear form and negotiation results after successful scheduling
         setMeetingRequest({
           title: "",
           preferred_date: "",
@@ -239,6 +282,14 @@ export function VoiceInterface() {
           duration_minutes: 60,
         })
         setTranscript("")
+        setNegotiationResult(null) // Clear the available slots list
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccessMessage("")
+        }, 3000)
+      } else {
+        setError("Failed to schedule meeting. Please try again.")
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to schedule meeting")
@@ -401,6 +452,13 @@ export function VoiceInterface() {
           </div>
         )}
 
+        {/* Success Message */}
+        {successMessage && (
+          <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-green-700 text-sm">
+            {successMessage}
+          </div>
+        )}
+
         {/* Negotiation Results */}
         {negotiationResult && (
           <div className="space-y-4">
@@ -426,6 +484,9 @@ export function VoiceInterface() {
                         })}
                       </div>
                       <div className="text-xs text-muted-foreground">Quality Score: {slot.quality_score}</div>
+                      <div className="text-xs text-blue-600 mt-1 font-medium">
+                        💡 {slot.explanation}
+                      </div>
                     </div>
                     <Button
                       size="sm"

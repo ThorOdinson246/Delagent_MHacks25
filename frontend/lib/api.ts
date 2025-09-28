@@ -53,7 +53,7 @@ export interface CalendarBlock {
   created_at: string
 }
 
-const API_BASE_URL = "http://localhost:4000"
+const API_BASE_URL = "http://localhost:3001"
 
 class ApiService {
   private async fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {

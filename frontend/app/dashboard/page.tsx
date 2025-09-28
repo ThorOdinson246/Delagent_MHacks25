@@ -7,6 +7,8 @@ import { MeetingDashboard } from "@/components/meeting-dashboard"
 import { NegotiationView } from "@/components/negotiation-view"
 import { AgentStatus } from "@/components/agent-status"
 import { FullPageVoiceInterface } from "@/components/full-page-voice-interface"
+import { RealTimeNegotiation } from "@/components/real-time-negotiation"
+import { RealTimeCalendar } from "@/components/real-time-calendar"
 
 export default function DashboardPage() {
   const [showFullPageVoice, setShowFullPageVoice] = useState(true)
@@ -33,6 +35,16 @@ export default function DashboardPage() {
         <div className="grid lg:grid-cols-2 gap-8">
           <VoiceInterface />
           <AgentStatus />
+        </div>
+
+        <RealTimeNegotiation onMeetingScheduled={(meetingId) => {
+          console.log("Meeting scheduled:", meetingId)
+          // Refresh meeting dashboard
+        }} />
+
+        <div className="grid lg:grid-cols-2 gap-8">
+          <RealTimeCalendar userId="bob" />
+          <RealTimeCalendar userId="alice" />
         </div>
 
         <MeetingDashboard />

@@ -1,121 +1,122 @@
 class TTSService {
-  private audioContext: AudioContext | null = null;
+  private synth: SpeechSynthesis | null = null;
+  private voices: SpeechSynthesisVoice[] = [];
+  private currentVoice: SpeechSynthesisVoice | null = null;
 
-  private async initAudioContext() {
-    if (!this.audioContext) {
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  constructor() {
+    // Only initialize in browser environment
+    if (typeof window !== 'undefined') {
+      this.synth = window.speechSynthesis;
+      this.loadVoices();
+      
+      // Load voices when they become available
+      if (this.synth.onvoiceschanged !== undefined) {
+        this.synth.onvoiceschanged = () => this.loadVoices();
+      }
+    }
+  }
+
+  private loadVoices() {
+    if (!this.synth) return;
+    this.voices = this.synth.getVoices();
+    
+    // Prefer English voices, especially US English
+    const preferredVoices = this.voices.filter(voice => 
+      voice.lang.startsWith('en') && 
+      (voice.name.includes('US') || voice.name.includes('American') || voice.name.includes('Google'))
+    );
+    
+    if (preferredVoices.length > 0) {
+      this.currentVoice = preferredVoices[0];
+    } else if (this.voices.length > 0) {
+      this.currentVoice = this.voices[0];
     }
     
-    if (this.audioContext.state === 'suspended') {
-      await this.audioContext.resume();
-    }
+    console.log('Available voices:', this.voices.map(v => `${v.name} (${v.lang})`));
+    console.log('Selected voice:', this.currentVoice?.name);
   }
 
-  async textToSpeech(text: string): Promise<void> {
+  speak(text: string, options: {
+    rate?: number;
+    pitch?: number;
+    volume?: number;
+    onEnd?: () => void;
+    onError?: (error: Error) => void;
+  } = {}) {
     if (!text.trim()) {
-      throw new Error("Text cannot be empty");
+      console.warn('TTS: Empty text provided');
+      return;
     }
 
-    try {
-      await this.initAudioContext();
-
-      // Make API call to our backend TTS route
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
-      }
-
-      // Get the audio data as ArrayBuffer
-      const audioBuffer = await response.arrayBuffer();
-
-      // Convert ArrayBuffer to audio and play
-      await this.playAudioBuffer(audioBuffer);
-    } catch (error) {
-      console.error("Text-to-speech error:", error);
-      throw new Error("Failed to convert text to speech");
+    if (!this.synth) {
+      console.warn('TTS: Speech synthesis not available (server-side rendering)');
+      return;
     }
+
+    // Cancel any ongoing speech
+    this.synth.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Set voice
+    if (this.currentVoice) {
+      utterance.voice = this.currentVoice;
+    }
+    
+    // Set speech parameters
+    utterance.rate = options.rate || 0.9; // Slightly slower for better comprehension
+    utterance.pitch = options.pitch || 1.0;
+    utterance.volume = options.volume || 0.8;
+    
+    // Set event handlers
+    utterance.onend = () => {
+      console.log('TTS: Speech completed');
+      options.onEnd?.();
+    };
+    
+    utterance.onerror = (event) => {
+      console.error('TTS: Speech error:', event);
+      options.onError?.(new Error(`Speech synthesis error: ${event.error}`));
+    };
+    
+    utterance.onstart = () => {
+      console.log('TTS: Speech started');
+    };
+    
+    // Speak the text
+    console.log('TTS: Speaking:', text);
+    this.synth.speak(utterance);
   }
 
-  private async playAudioBuffer(audioBuffer: ArrayBuffer): Promise<void> {
-    if (!this.audioContext) {
-      throw new Error("Audio context not initialized");
-    }
-
-    try {
-      // Decode the audio data
-      const decodedData = await this.audioContext.decodeAudioData(audioBuffer.slice(0));
-      
-      // Create audio source
-      const source = this.audioContext.createBufferSource();
-      source.buffer = decodedData;
-      source.connect(this.audioContext.destination);
-      
-      // Play the audio
-      source.start();
-
-      // Return a promise that resolves when audio finishes playing
-      return new Promise((resolve) => {
-        source.onended = () => resolve();
-      });
-    } catch (error) {
-      console.error("Error playing audio:", error);
-      throw new Error("Failed to play audio");
-    }
+  stop() {
+    if (!this.synth) return;
+    this.synth.cancel();
+    console.log('TTS: Speech stopped');
   }
 
-  // Alternative method using HTML5 Audio API (more compatible but less control)
-  async textToSpeechSimple(text: string): Promise<void> {
-    if (!text.trim()) {
-      throw new Error("Text cannot be empty");
-    }
+  isSpeaking(): boolean {
+    return this.synth ? this.synth.speaking : false;
+  }
 
-    try {
-      // Make API call to our backend TTS route
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
+  pause() {
+    if (!this.synth) return;
+    this.synth.pause();
+  }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
-      }
+  resume() {
+    if (!this.synth) return;
+    this.synth.resume();
+  }
 
-      // Create a blob from the response
-      const blob = await response.blob();
-      const audioUrl = URL.createObjectURL(blob);
-      
-      // Create and play audio element
-      const audio = new Audio(audioUrl);
-      
-      return new Promise((resolve, reject) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          resolve();
-        };
-        audio.onerror = () => {
-          URL.revokeObjectURL(audioUrl);
-          reject(new Error("Failed to play audio"));
-        };
-        
-        audio.play().catch(reject);
-      });
-    } catch (error) {
-      console.error("Text-to-speech error:", error);
-      throw new Error("Failed to convert text to speech");
-    }
+  getAvailableVoices(): SpeechSynthesisVoice[] {
+    return this.voices;
+  }
+
+  setVoice(voice: SpeechSynthesisVoice) {
+    this.currentVoice = voice;
+    console.log('TTS: Voice changed to:', voice.name);
   }
 }
 
-export const ttsService = new TTSService();
+// Only create TTS service in browser environment
+export const ttsService = typeof window !== 'undefined' ? new TTSService() : null;

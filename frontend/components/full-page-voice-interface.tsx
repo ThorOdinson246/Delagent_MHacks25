@@ -9,6 +9,7 @@ import { Mic, MicOff, Send, Calendar, X } from "lucide-react"
 import { apiService, type MeetingRequest, type NegotiationResult } from "@/lib/api"
 import { audioRecorderService } from "@/lib/audio-recorder-service"
 import { voiceService } from "@/lib/voice-service"
+import { ttsService } from "@/lib/tts-service"
 import { EnhancedAudioVisualizer } from "./enhanced-audio-visualizer"
 
 export function FullPageVoiceInterface({ onClose }: { onClose: () => void }) {
@@ -23,6 +24,7 @@ export function FullPageVoiceInterface({ onClose }: { onClose: () => void }) {
   const [negotiationResult, setNegotiationResult] = useState<NegotiationResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [silenceCountdown, setSilenceCountdown] = useState(0)
   const [audioLevels, setAudioLevels] = useState<number[]>([])
@@ -79,9 +81,17 @@ export function FullPageVoiceInterface({ onClose }: { onClose: () => void }) {
         setNegotiationResult(result.context.negotiationResult)
       }
       
-      // Log the AI-generated response (TTS functionality removed)
+      // Speak the AI-generated response
       if (result.spokenResponse) {
         console.log("AI response:", result.spokenResponse)
+        if (ttsService) {
+          ttsService.speak(result.spokenResponse, {
+            onEnd: () => console.log("TTS completed"),
+            onError: (error) => console.error("TTS error:", error)
+          })
+        } else {
+          console.log("TTS not available (server-side rendering)")
+        }
       }
       
     } catch (err) {
@@ -213,8 +223,13 @@ export function FullPageVoiceInterface({ onClose }: { onClose: () => void }) {
       setLoading(true)
       setError(null)
       const result = await apiService.scheduleMeeting(meetingRequest, slotIndex)
-      setNegotiationResult(result)
+      
       if (result.success) {
+        // Show success message
+        setError(null)
+        setSuccessMessage("✅ Meeting scheduled successfully!")
+        
+        // Clear form and negotiation results after successful scheduling
         setMeetingRequest({
           title: "",
           preferred_date: "",
@@ -222,6 +237,14 @@ export function FullPageVoiceInterface({ onClose }: { onClose: () => void }) {
           duration_minutes: 60,
         })
         setTranscript("")
+        setNegotiationResult(null) // Clear the available slots list
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setSuccessMessage("")
+        }, 3000)
+      } else {
+        setError("Failed to schedule meeting. Please try again.")
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to schedule meeting")
@@ -403,6 +426,13 @@ export function FullPageVoiceInterface({ onClose }: { onClose: () => void }) {
                 </div>
               )}
 
+              {/* Success Message */}
+              {successMessage && (
+                <div className="p-4 bg-green-100 border border-green-300 rounded-lg text-green-700">
+                  {successMessage}
+                </div>
+              )}
+
               {/* Negotiation Results */}
               {negotiationResult && (
                 <div className="space-y-4">
@@ -428,6 +458,9 @@ export function FullPageVoiceInterface({ onClose }: { onClose: () => void }) {
                               })}
                             </div>
                             <div className="text-sm text-gray-600">Quality Score: {slot.quality_score}</div>
+                            <div className="text-sm text-blue-600 mt-1 font-medium">
+                              💡 {slot.explanation}
+                            </div>
                           </div>
                           <Button
                             size="sm"

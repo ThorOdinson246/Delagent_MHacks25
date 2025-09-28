@@ -11,9 +11,18 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
 import uuid
 import re
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+import json
+import asyncio
+from typing import List, Dict, Any
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add agent directories to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '@agent1_pappu'))
@@ -39,6 +48,7 @@ class TimeSlot(BaseModel):
     day_of_week: str
     date_formatted: str
     time_formatted: str
+    explanation: str
 
 class NegotiationResult(BaseModel):
     success: bool
@@ -159,9 +169,18 @@ class APINegotiation:
                     pappu_conflicts = await self.calendar_service.check_time_conflict("bob", test_start, test_end)
                     alice_conflicts = await self.calendar_service.check_time_conflict("alice", test_start, test_end)
                     
-                    if not pappu_conflicts and not alice_conflicts:
+                    # Be more lenient - allow slots if conflicts are low priority or moveable
+                    pappu_has_conflict = any(not conflict.get('is_moveable', False) and conflict.get('priority', 5) >= 7 for conflict in pappu_conflicts)
+                    alice_has_conflict = any(not conflict.get('is_moveable', False) and conflict.get('priority', 5) >= 7 for conflict in alice_conflicts)
+                    
+                    if not pappu_has_conflict and not alice_has_conflict:
                         # Calculate quality score
                         quality_score = self.calculate_slot_quality(test_start, preferred_datetime)
+                        
+                        # Reduce quality score if there are any conflicts (even low priority ones)
+                        if pappu_conflicts or alice_conflicts:
+                            quality_score = max(10, quality_score - 20)
+                        
                         available_slots.append({
                             "start_time": test_start,
                             "end_time": test_end,
@@ -173,6 +192,10 @@ class APINegotiation:
         
         # Sort by quality score (higher is better)
         available_slots.sort(key=lambda x: x["quality_score"], reverse=True)
+        
+        # Generate dynamic explanations using Gemini
+        for i, slot in enumerate(available_slots[:3]):
+            slot["explanation"] = await self.generate_slot_explanation(slot, preferred_datetime, i)
         
         return available_slots[:3]  # Return top 3 options for AI agent negotiation
     
@@ -225,6 +248,10 @@ class APINegotiation:
         # Sort by quality score (higher is better)
         available_slots.sort(key=lambda x: x["quality_score"], reverse=True)
         
+        # Generate dynamic explanations using Gemini
+        for i, slot in enumerate(available_slots[:3]):
+            slot["explanation"] = await self.generate_slot_explanation(slot, preferred_datetime, i)
+        
         return available_slots[:3]  # Return top 3 options
     
     def calculate_slot_quality(self, slot_time: datetime, preferred_time: datetime) -> int:
@@ -262,6 +289,93 @@ class APINegotiation:
         
         return score
     
+    async def generate_slot_explanation(self, slot: Dict[str, Any], preferred_datetime: datetime, slot_index: int) -> str:
+        """Generate dynamic explanation using Gemini AI while maintaining privacy"""
+        try:
+            # Configure Gemini with environment variable and latest model
+            api_key = os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                raise Exception("GEMINI_API_KEY not found in environment variables")
+            
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            # Get conflicts for this time slot to understand why it's available/not available
+            start_time = slot["start_time"]
+            end_time = slot["end_time"]
+            
+            # Check conflicts for both users
+            pappu_conflicts = await self.calendar_service.check_time_conflict("bob", start_time, end_time)
+            alice_conflicts = await self.calendar_service.check_time_conflict("alice", start_time, end_time)
+            
+            # Prepare context for Gemini (without revealing specific names)
+            conflicts_info = []
+            if pappu_conflicts:
+                for conflict in pappu_conflicts:
+                    conflicts_info.append(f"Person A has: {conflict.get('block_type', 'meeting')} (priority: {conflict.get('priority', 5)})")
+            if alice_conflicts:
+                for conflict in alice_conflicts:
+                    conflicts_info.append(f"Person B has: {conflict.get('block_type', 'meeting')} (priority: {conflict.get('priority', 5)})")
+            
+            # Create prompt for Gemini
+            preferred_start = datetime.combine(preferred_datetime.date(), preferred_datetime.time())
+            is_exact_match = slot["start_time"] == preferred_start
+            
+            prompt = f"""
+            You are a scheduling assistant. Generate a brief, helpful explanation for a meeting time slot.
+            
+            Context:
+            - Requested time: {preferred_datetime.strftime('%A, %B %d at %I:%M %p')}
+            - Available slot: {start_time.strftime('%A, %B %d at %I:%M %p')} - {end_time.strftime('%I:%M %p')}
+            - Slot quality score: {slot['quality_score']}
+            - Slot position: {slot_index + 1} (1st, 2nd, or 3rd best option)
+            - Exact time match: {is_exact_match}
+            
+            Current schedule conflicts:
+            {conflicts_info if conflicts_info else "No conflicts found"}
+            
+            Generate a natural, helpful explanation (1-2 sentences) that:
+            1. Explains why this time is suggested
+            2. Maintains privacy (don't mention specific people or meeting titles)
+            3. Is encouraging and professional
+            4. Explains the reasoning without being too technical
+            
+            Examples of good explanations:
+            - "This is your preferred time and it's available!"
+            - "This time works well as it avoids existing commitments."
+            - "This slot is available with minimal schedule conflicts."
+            - "This alternative time fits well around current appointments."
+            
+            Generate explanation:
+            """
+            
+            response = model.generate_content(prompt)
+            explanation = response.text.strip()
+            
+            # Fallback to simple explanation if Gemini fails
+            if not explanation or len(explanation) > 200:
+                if is_exact_match:
+                    explanation = "This is your preferred time and it's available!"
+                elif slot_index == 0:
+                    explanation = "This is the best available time close to your preference."
+                else:
+                    explanation = "This alternative time slot works well around existing commitments."
+            
+            return explanation
+            
+        except Exception as e:
+            print(f"Error generating explanation with Gemini: {e}")
+            # Fallback to simple explanations
+            preferred_start = datetime.combine(preferred_datetime.date(), preferred_datetime.time())
+            is_exact_match = slot["start_time"] == preferred_start
+            
+            if is_exact_match:
+                return "This is your preferred time and it's available!"
+            elif slot_index == 0:
+                return "This is the best available time close to your preference."
+            else:
+                return "This alternative time slot works well around existing commitments."
+    
     def format_slots_for_api(self, slots: List[Dict[str, Any]]) -> List[TimeSlot]:
         """Format slots for API response"""
         formatted_slots = []
@@ -277,7 +391,8 @@ class APINegotiation:
                 quality_score=slot["quality_score"],
                 day_of_week=start_time.strftime("%A"),
                 date_formatted=start_time.strftime("%Y-%m-%d"),
-                time_formatted=start_time.strftime("%H:%M")
+                time_formatted=start_time.strftime("%H:%M"),
+                explanation=slot.get("explanation", "Available time slot")
             ))
         
         return formatted_slots
@@ -333,6 +448,40 @@ class APINegotiation:
 # Initialize FastAPI app
 app = FastAPI(title="Agent Negotiation API", version="1.0.0")
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                # Remove disconnected connections
+                self.active_connections.remove(connection)
+
+manager = ConnectionManager()
+
 # Global negotiation instance
 negotiation = APINegotiation()
 
@@ -352,9 +501,25 @@ async def root():
             "POST /schedule": "Schedule a specific meeting slot",
             "GET /meetings": "Get all meetings from database",
             "GET /calendar/{user_id}": "Get calendar for user (bob/alice)",
-            "GET /health": "Health check"
+            "GET /health": "Health check",
+            "WS /ws": "Real-time WebSocket updates"
         }
     }
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time updates
+    """
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive and handle incoming messages
+            data = await websocket.receive_text()
+            # Echo back for testing
+            await manager.send_personal_message(f"Echo: {data}", websocket)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 @app.get("/health")
 async def health_check():
@@ -410,10 +575,36 @@ async def negotiate_meeting(request: MeetingRequest):
     Find available meeting slots based on user preferences
     """
     try:
+        # Send initial negotiation message
+        await manager.broadcast(json.dumps({
+            "type": "negotiation_start",
+            "message": f"🤖 Starting negotiation for '{request.title}'",
+            "timestamp": datetime.now().isoformat()
+        }))
+        
         # Validate input
         is_valid, error_message = negotiation.validate_input(request)
         if not is_valid:
+            await manager.broadcast(json.dumps({
+                "type": "negotiation_error",
+                "message": f"❌ Validation failed: {error_message}",
+                "timestamp": datetime.now().isoformat()
+            }))
             raise HTTPException(status_code=400, detail=error_message)
+        
+        # Send agent communication message
+        if request.is_ai_agent_meeting:
+            await manager.broadcast(json.dumps({
+                "type": "agent_communication",
+                "message": "🤖 Pappu's Agent: Initiating meeting request with Alice's Agent",
+                "timestamp": datetime.now().isoformat()
+            }))
+        else:
+            await manager.broadcast(json.dumps({
+                "type": "agent_communication", 
+                "message": "👤 Pappu's Agent: Checking personal availability for external meeting",
+                "timestamp": datetime.now().isoformat()
+            }))
         
         # Find available slots
         available_slots = await negotiation.find_available_slots(request)
@@ -441,6 +632,11 @@ async def negotiate_meeting(request: MeetingRequest):
         
         # Handle case when no slots are found
         if not available_slots:
+            await manager.broadcast(json.dumps({
+                "type": "negotiation_result",
+                "message": "❌ No available time slots found. Consider trying different dates or times.",
+                "timestamp": datetime.now().isoformat()
+            }))
             return NegotiationResult(
                 success=False,
                 meeting_request=request,
@@ -457,6 +653,14 @@ async def negotiate_meeting(request: MeetingRequest):
             )
         
         formatted_slots = negotiation.format_slots_for_api(available_slots)
+        
+        # Send success message with slot details
+        await manager.broadcast(json.dumps({
+            "type": "negotiation_result",
+            "message": f"✅ Found {len(formatted_slots)} available time slots",
+            "slots": [slot.dict() for slot in formatted_slots] if formatted_slots else [],
+            "timestamp": datetime.now().isoformat()
+        }))
         
         return NegotiationResult(
             success=True,
@@ -514,10 +718,31 @@ async def schedule_meeting(request: MeetingRequest, slot_index: int = 0):
         formatted_slots = negotiation.format_slots_for_api(available_slots)
         selected_slot = formatted_slots[slot_index]
         
+        # Send scheduling message
+        await manager.broadcast(json.dumps({
+            "type": "scheduling_start",
+            "message": f"📅 Scheduling meeting '{request.title}' for {selected_slot.date_formatted} at {selected_slot.time_formatted}",
+            "timestamp": datetime.now().isoformat()
+        }))
+        
         # Schedule the meeting
         success, meeting_id = await negotiation.schedule_meeting(selected_slot_data, request)
         
         if success:
+            # Send success message
+            await manager.broadcast(json.dumps({
+                "type": "meeting_scheduled",
+                "message": f"✅ Meeting '{request.title}' scheduled successfully!",
+                "meeting_id": meeting_id,
+                "meeting_details": {
+                    "title": request.title,
+                    "date": selected_slot.date_formatted,
+                    "time": selected_slot.time_formatted,
+                    "duration": selected_slot.duration_minutes
+                },
+                "timestamp": datetime.now().isoformat()
+            }))
+            
             return NegotiationResult(
                 success=True,
                 meeting_request=request,
@@ -530,6 +755,11 @@ async def schedule_meeting(request: MeetingRequest, slot_index: int = 0):
                 timestamp=datetime.now().isoformat()
             )
         else:
+            await manager.broadcast(json.dumps({
+                "type": "scheduling_error",
+                "message": "❌ Failed to schedule meeting",
+                "timestamp": datetime.now().isoformat()
+            }))
             return NegotiationResult(
                 success=False,
                 meeting_request=request,

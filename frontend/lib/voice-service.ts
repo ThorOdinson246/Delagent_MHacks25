@@ -1,6 +1,6 @@
 // Service to integrate with Express backend voice orchestrator
 class VoiceService {
-  private baseUrl = "http://localhost:4000"
+  private baseUrl = "http://localhost:3001"
 
   async processVoiceCommand(transcript: string, action: string = "schedule", context?: any) {
     const response = await fetch(`${this.baseUrl}/api/voice-command`, {

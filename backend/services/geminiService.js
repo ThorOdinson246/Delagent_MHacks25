@@ -21,7 +21,10 @@ export async function extractMeetingIntent(transcript) {
     const prompt = `
         You are an intelligent scheduling assistant. Your task is to extract meeting details from a user's voice command and format them into a specific JSON structure.
         The user is located in Ann Arbor, Michigan, United States.
-        The current date and time is Saturday, September 27, 2025 at 5:54 PM EDT.
+        The current date and time is Saturday, September 27, 2025 at 9:08 PM EDT.
+        
+        IMPORTANT: Only schedule meetings on weekdays (Monday-Friday). If the user requests "tomorrow" and tomorrow is a weekend, 
+        schedule for the next available weekday instead.
 
         Analyze the following transcript: "${transcript}"
 
@@ -38,10 +41,12 @@ export async function extractMeetingIntent(transcript) {
         JSON Output:
         {
             "title": "marketing sync",
-            "preferred_date": "2025-09-28",
+            "preferred_date": "2025-09-30",
             "preferred_time": "14:30",
             "duration_minutes": 45
         }
+        
+        Note: Since tomorrow (Sept 28) is Sunday, schedule for Monday (Sept 30) instead.
     `;
 
     try {

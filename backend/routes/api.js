@@ -12,79 +12,123 @@ router.get('/health', (req, res) => {
     });
 });
 
-// Get all meetings endpoint (mock data)
-router.get('/meetings', (req, res) => {
-    res.json({
-        success: true,
-        meetings: [
-            {
-                id: "1",
-                title: "Marketing Sync",
-                duration_minutes: 60,
-                preferred_start_time: "2025-09-28T14:00:00Z",
-                preferred_end_time: "2025-09-28T15:00:00Z", 
-                status: "negotiating",
-                created_at: "2025-09-27T10:00:00Z"
+// Get all meetings endpoint
+router.get('/meetings', async (req, res) => {
+    try {
+        console.log('[Express Backend] Calling Python backend for meetings');
+        
+        const pythonResponse = await fetch('http://localhost:8000/meetings', {
+            method: 'GET',
+            headers: { 
+                'Content-Type': 'application/json' 
             }
-        ],
-        total_meetings: 1,
-        timestamp: new Date().toISOString()
-    });
+        });
+        
+        if (!pythonResponse.ok) {
+            throw new Error(`Python backend error: ${pythonResponse.status} ${pythonResponse.statusText}`);
+        }
+        
+        const pythonResult = await pythonResponse.json();
+        console.log('[Express Backend] Received meetings from Python backend:', pythonResult);
+        
+        res.json(pythonResult);
+    } catch (error) {
+        console.error('[Express Backend] Error calling Python backend for meetings:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to connect to agent meetings service',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
-// Get user calendar endpoint (mock data)
-router.get('/calendar/:userId', (req, res) => {
+// Get user calendar endpoint
+router.get('/calendar/:userId', async (req, res) => {
     const { userId } = req.params;
-    res.json({
-        success: true,
-        user_id: userId,
-        calendar_blocks: [
-            {
-                id: "1",
-                user_id: userId,
-                title: "Existing Meeting",
-                start_time: "2025-09-28T10:00:00Z",
-                end_time: "2025-09-28T11:00:00Z",
-                block_type: "meeting",
-                priority_level: 3,
-                is_flexible: false,
-                created_at: "2025-09-27T10:00:00Z"
+    
+    try {
+        console.log('[Express Backend] Calling Python backend for calendar:', userId);
+        
+        const pythonResponse = await fetch(`http://localhost:8000/calendar/${userId}`, {
+            method: 'GET',
+            headers: { 
+                'Content-Type': 'application/json' 
             }
-        ],
-        total_blocks: 1,
-        timestamp: new Date().toISOString()
-    });
+        });
+        
+        if (!pythonResponse.ok) {
+            throw new Error(`Python backend error: ${pythonResponse.status} ${pythonResponse.statusText}`);
+        }
+        
+        const pythonResult = await pythonResponse.json();
+        console.log('[Express Backend] Received calendar from Python backend:', pythonResult);
+        
+        res.json(pythonResult);
+    } catch (error) {
+        console.error('[Express Backend] Error calling Python backend for calendar:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to connect to agent calendar service',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Negotiate meeting endpoint 
 router.post('/negotiate', async (req, res) => {
     const meetingRequest = req.body;
     
-    // Mock negotiation result - in real app this would call Python backend
-    res.json({
-        success: true,
-        meeting_request: meetingRequest,
-        available_slots: [
-            {
-                start_time: "2025-09-29T14:00:00",
-                end_time: "2025-09-29T15:00:00", 
-                duration_minutes: meetingRequest.duration_minutes,
-                quality_score: 115,
-                day_of_week: "Monday",
-                date_formatted: "2025-09-29",
-                time_formatted: "14:00"
-            }
-        ],
-        total_slots_found: 1,
-        search_window: {
-            start: "2025-09-25T18:00:00",
-            end: "2025-10-05T18:00:00"
-        },
-        selected_slot: null,
-        meeting_id: null,
-        message: "Found 1 available time slots",
-        timestamp: new Date().toISOString()
-    });
+    // Validate meeting request
+    if (!meetingRequest.title || !meetingRequest.preferred_date || !meetingRequest.preferred_time) {
+        return res.status(400).json({
+            success: false,
+            error: 'Invalid meeting request',
+            message: 'Meeting request must include title, preferred_date, and preferred_time',
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    try {
+        console.log('[Express Backend] Calling Python backend for negotiation:', meetingRequest);
+        
+        // Call the actual Python backend
+        const pythonResponse = await fetch('http://localhost:8000/negotiate', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify(meetingRequest)
+        });
+        
+        if (!pythonResponse.ok) {
+            throw new Error(`Python backend error: ${pythonResponse.status} ${pythonResponse.statusText}`);
+        }
+        
+        const pythonResult = await pythonResponse.json();
+        console.log('[Express Backend] Received from Python backend:', pythonResult);
+        
+        // Emit real-time update via WebSocket
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('negotiation-update', {
+                type: 'negotiation_result',
+                data: pythonResult,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        res.json(pythonResult);
+    } catch (error) {
+        console.error('[Express Backend] Error calling Python backend:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to connect to agent negotiation service',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Schedule meeting endpoint
@@ -92,25 +136,55 @@ router.post('/schedule', async (req, res) => {
     const meetingRequest = req.body;
     const slotIndex = req.query.slot_index || 0;
     
-    // Mock successful scheduling
-    res.json({
-        success: true,
-        meeting_request: meetingRequest,
-        available_slots: [],
-        total_slots_found: 0,
-        selected_slot: {
-            start_time: "2025-09-29T14:00:00",
-            end_time: "2025-09-29T15:00:00",
-            duration_minutes: meetingRequest.duration_minutes,
-            quality_score: 115,
-            day_of_week: "Monday", 
-            date_formatted: "2025-09-29",
-            time_formatted: "14:00"
-        },
-        meeting_id: "scheduled_" + Date.now(),
-        message: "Meeting successfully scheduled",
-        timestamp: new Date().toISOString()
-    });
+    // Validate meeting request
+    if (!meetingRequest.title || !meetingRequest.preferred_date || !meetingRequest.preferred_time) {
+        return res.status(400).json({
+            success: false,
+            error: 'Invalid meeting request',
+            message: 'Meeting request must include title, preferred_date, and preferred_time',
+            timestamp: new Date().toISOString()
+        });
+    }
+    
+    try {
+        console.log('[Express Backend] Calling Python backend for scheduling:', { meetingRequest, slotIndex });
+        
+        // Call the actual Python backend
+        const pythonResponse = await fetch(`http://localhost:8000/schedule?slot_index=${slotIndex}`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify(meetingRequest)
+        });
+        
+        if (!pythonResponse.ok) {
+            throw new Error(`Python backend error: ${pythonResponse.status} ${pythonResponse.statusText}`);
+        }
+        
+        const pythonResult = await pythonResponse.json();
+        console.log('[Express Backend] Received scheduling result from Python backend:', pythonResult);
+        
+        // Emit real-time update via WebSocket
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('scheduling-update', {
+                type: 'scheduling_result',
+                data: pythonResult,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        res.json(pythonResult);
+    } catch (error) {
+        console.error('[Express Backend] Error calling Python backend for scheduling:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to connect to agent scheduling service',
+            message: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Middleware to validate API configuration
@@ -139,48 +213,19 @@ router.post('/voice-command', validateConfig, async (req, res) => {
             const meetingDetailsJSON = await extractMeetingIntent(transcript);
             console.log('[Node Backend] Step 2: Extracted meeting details from transcript:', meetingDetailsJSON);
             
-            // --- PYTHON BACKEND CALL (SIMULATED) ---
-            // In a real application, you would make an HTTP POST request to your Python server here
-            // using the 'meetingDetailsJSON' as the payload.
+            // --- PYTHON BACKEND CALL ---
             console.log('[Node Backend] Step 3: Sending extracted details to Python backend...');
-            // const pythonResponse = await fetch('http://your-python-backend-url/negotiate', {
-            //   method: 'POST',
-            //   headers: { 'Content-Type': 'application/json' },
-            //   body: JSON.stringify(meetingDetailsJSON)
-            // });
-            // const pythonResult = await pythonResponse.json();
-
-            // For now, we'll use a realistic mock response that matches your Python server's output
-            const pythonResult = {
-                "success": true,
-                "meeting_request": {
-                    "title": meetingDetailsJSON.title,
-                    "preferred_date": meetingDetailsJSON.preferred_date,
-                    "preferred_time": meetingDetailsJSON.preferred_time,
-                    "duration_minutes": meetingDetailsJSON.duration_minutes,
-                    "is_ai_agent_meeting": true
-                },
-                "available_slots": [
-                    {
-                        "start_time": "2025-09-29T14:00:00",
-                        "end_time": "2025-09-29T15:00:00",
-                        "duration_minutes": 60,
-                        "quality_score": 115,
-                        "day_of_week": "Monday",
-                        "date_formatted": "2025-09-29",
-                        "time_formatted": "14:00"
-                    }
-                ],
-                "total_slots_found": 1,
-                "search_window": {
-                    "start": "2025-09-25T18:00:00",
-                    "end": "2025-10-05T18:00:00"
-                },
-                "selected_slot": null,
-                "meeting_id": null,
-                "message": "Found 1 available time slots",
-                "timestamp": new Date().toISOString()
-            };
+            const pythonResponse = await fetch('http://localhost:8000/negotiate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(meetingDetailsJSON)
+            });
+            
+            if (!pythonResponse.ok) {
+                throw new Error(`Python backend error: ${pythonResponse.status} ${pythonResponse.statusText}`);
+            }
+            
+            const pythonResult = await pythonResponse.json();
             console.log('[Node Backend] Step 4: Received negotiation result from Python backend:', pythonResult);
 
             // Step 2: Generate a natural language response from the Python backend's JSON output
@@ -198,18 +243,64 @@ router.post('/voice-command', validateConfig, async (req, res) => {
             });
 
         } else if (action === 'confirm') {
-            // This part would handle "yes/no" after the initial response
-            // For the hackathon, you can expand this to call the /schedule endpoint on the Python backend
+            // Handle "yes/no" confirmation after the initial response
             console.log(`[Node Backend] Confirmation received: "${transcript}"`);
             console.log('[Node Backend] Context received for confirmation:', context);
             
-            // Here, you would confirm the intent is "yes" and then call the Python /schedule endpoint
-            // with the context.negotiationResult.available_slots[0] and context.originalRequest
-            
-            res.json({
-                spokenResponse: "Great! I have scheduled that meeting for you.",
-                finalAction: "MEETING_CONFIRMED"
-            });
+            try {
+                // Check if user confirmed (yes/confirm/ok/schedule)
+                const lowerTranscript = transcript.toLowerCase();
+                const isConfirmed = lowerTranscript.includes('yes') || 
+                                  lowerTranscript.includes('confirm') || 
+                                  lowerTranscript.includes('ok') || 
+                                  lowerTranscript.includes('schedule') ||
+                                  lowerTranscript.includes('book');
+                
+                if (isConfirmed && context?.negotiationResult?.available_slots?.length > 0) {
+                    // Call Python backend to schedule the meeting
+                    console.log('[Node Backend] User confirmed, scheduling meeting...');
+                    
+                    const scheduleResponse = await fetch('http://localhost:8000/schedule?slot_index=0', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(context.originalRequest)
+                    });
+                    
+                    if (!scheduleResponse.ok) {
+                        throw new Error(`Python backend scheduling error: ${scheduleResponse.status}`);
+                    }
+                    
+                    const scheduleResult = await scheduleResponse.json();
+                    console.log('[Node Backend] Scheduling result:', scheduleResult);
+                    
+                    if (scheduleResult.success) {
+                        res.json({
+                            spokenResponse: "Great! I have scheduled that meeting for you.",
+                            finalAction: "MEETING_CONFIRMED",
+                            context: {
+                                ...context,
+                                scheduleResult
+                            }
+                        });
+                    } else {
+                        res.json({
+                            spokenResponse: "I'm sorry, there was an issue scheduling the meeting. Please try again.",
+                            finalAction: "SCHEDULING_FAILED"
+                        });
+                    }
+                } else {
+                    res.json({
+                        spokenResponse: "I didn't understand your response. Please say 'yes' to confirm or 'no' to cancel.",
+                        finalAction: "CONFIRMATION_NEEDED"
+                    });
+                }
+            } catch (error) {
+                console.error('[Node Backend] Error during confirmation:', error);
+                res.json({
+                    spokenResponse: "I'm sorry, there was an issue processing your confirmation. Please try again.",
+                    finalAction: "CONFIRMATION_ERROR"
+                });
+            }
         }
 
 
