@@ -714,14 +714,26 @@ async def negotiate_meeting(request: MeetingRequest):
             }))
             raise HTTPException(status_code=400, detail=error_message)
         
-        # Send detailed 3-agent communication messages
+        # Send detailed 3-agent communication messages with real calendar analysis
         if request.is_ai_agent_meeting:
-            # Alice's initial response
+            # Get actual calendar data for realistic reasoning
+            pappu_calendar = await negotiation.calendar_service.get_user_calendar_blocks("bob")
+            alice_calendar = await negotiation.calendar_service.get_user_calendar_blocks("alice") 
+            charlie_calendar = await negotiation.calendar_service.get_user_calendar_blocks("charlie")
+            
+            # Alice's initial response with real calendar analysis
+            alice_focus_blocks = [block for block in alice_calendar if 'focus' in str(block.get('block_type', '')).lower()]
             await manager.broadcast(json.dumps({
                 "type": "agent_reasoning",
                 "agent": "Alice's Agent",
-                "message": "🎯 Alice's Agent: Analyzing request with focus-time protection",
-                "reasoning": "Scanning my deep work blocks and focus sessions. I need to protect my productivity windows while finding collaborative opportunities.",
+                "message": f"🎯 Alice's Agent: Analyzing {len(alice_focus_blocks)} focus blocks for conflicts",
+                "reasoning": f"I have {len(alice_focus_blocks)} critical focus sessions this week. Any meeting that disrupts these will severely impact my productivity. I'm particularly protective of my 9AM-1PM deep work windows.",
+                "confidence": 95,
+                "calendar_analysis": {
+                    "total_blocks": len(alice_calendar),
+                    "focus_blocks": len(alice_focus_blocks),
+                    "flexibility": "Low - Focus time is non-negotiable"
+                },
                 "timestamp": datetime.now().isoformat()
             }))
             
@@ -729,54 +741,101 @@ async def negotiate_meeting(request: MeetingRequest):
             import asyncio
             await asyncio.sleep(0.8)
             
-            # Charlie's strategic analysis
+            # Charlie's strategic analysis with real data
+            charlie_strategic_blocks = [block for block in charlie_calendar if 'Strategic' in str(block.get('title', ''))]
+            charlie_flexible_blocks = [block for block in charlie_calendar if block.get('block_type') == 'flexible']
             await manager.broadcast(json.dumps({
                 "type": "agent_reasoning",
-                "agent": "Charlie's Agent",
-                "message": "📊 Charlie's Agent: Conducting strategic scheduling analysis",
-                "reasoning": "Evaluating operational efficiency metrics. Analyzing team productivity windows and optimal meeting batching opportunities.",
+                "agent": "Charlie's Agent", 
+                "message": f"📊 Charlie's Agent: Found {len(charlie_strategic_blocks)} strategic blocks, {len(charlie_flexible_blocks)} flexible slots",
+                "reasoning": f"My analysis shows {len(charlie_strategic_blocks)} strategic planning sessions that are critical for operational efficiency. I have {len(charlie_flexible_blocks)} flexible collaboration windows that could accommodate team meetings if they align with productivity metrics.",
+                "confidence": 88,
+                "calendar_analysis": {
+                    "strategic_blocks": len(charlie_strategic_blocks),
+                    "flexible_slots": len(charlie_flexible_blocks),
+                    "efficiency_focus": "High - Optimizing for team productivity"
+                },
                 "timestamp": datetime.now().isoformat()
             }))
             
             await asyncio.sleep(0.8)
             
-            # Pappu's collaborative response
+            # Pappu's collaborative response with real flexibility analysis
+            pappu_flexible_blocks = [block for block in pappu_calendar if block.get('block_type') == 'flexible']
+            pappu_meetings = [block for block in pappu_calendar if 'meeting' in str(block.get('title', '')).lower() or 'call' in str(block.get('title', '')).lower()]
             await manager.broadcast(json.dumps({
                 "type": "agent_reasoning",
                 "agent": "Pappu's Agent",
-                "message": "🤝 Pappu's Agent: Coordinating 3-way negotiation",
-                "reasoning": "Balancing team needs with individual preferences. Looking for win-win solutions that work for everyone's schedule.",
+                "message": f"🤝 Pappu's Agent: I have {len(pappu_flexible_blocks)} flexible blocks and {len(pappu_meetings)} existing meetings",
+                "reasoning": f"As the collaborative coordinator, I can reschedule {len(pappu_flexible_blocks)} flexible work blocks to accommodate team needs. My {len(pappu_meetings)} existing meetings show I'm used to context switching. I'll prioritize finding a solution that respects Alice's focus time while leveraging Charlie's efficiency insights.",
+                "confidence": 82,
+                "calendar_analysis": {
+                    "flexible_blocks": len(pappu_flexible_blocks),
+                    "existing_meetings": len(pappu_meetings),
+                    "collaboration_style": "High flexibility - Team success first"
+                },
                 "timestamp": datetime.now().isoformat()
             }))
             
             await asyncio.sleep(1)
             
-            # Multi-agent discussion simulation
+            # Multi-agent discussion with real conflicts and agreements
+            # Analyze the requested time against each agent's calendar
+            requested_time = datetime.strptime(f"{request.preferred_date} {request.preferred_time}", "%Y-%m-%d %H:%M")
+            
+            # Check for actual conflicts
+            alice_conflicts = await negotiation.calendar_service.check_time_conflict("alice", requested_time, requested_time + timedelta(minutes=request.duration_minutes))
+            charlie_conflicts = await negotiation.calendar_service.check_time_conflict("charlie", requested_time, requested_time + timedelta(minutes=request.duration_minutes))
+            pappu_conflicts = await negotiation.calendar_service.check_time_conflict("bob", requested_time, requested_time + timedelta(minutes=request.duration_minutes))
+            
+            # Alice's realistic evaluation
+            alice_has_focus_conflict = any('focus' in str(conflict.get('block_type', '')).lower() for conflict in alice_conflicts)
             await manager.broadcast(json.dumps({
                 "type": "agent_reasoning",
                 "agent": "Alice's Agent",
-                "message": "💭 Alice: Evaluating proposed time slots",
-                "reasoning": "Checking each option against my focus time requirements. Some slots would disrupt deep work, others look promising.",
+                "message": f"💭 Alice: {'❌ MAJOR CONFLICT' if alice_has_focus_conflict else '✅ Evaluating options'} - {len(alice_conflicts)} conflicts found",
+                "reasoning": f"The requested time {'DIRECTLY conflicts with my focus session!' if alice_has_focus_conflict else 'looks manageable.'} I found {len(alice_conflicts)} calendar conflicts. {'This would severely disrupt my deep work productivity.' if alice_has_focus_conflict else 'I can work with this if we find the right alternative.'}",
+                "confidence": 95 if alice_has_focus_conflict else 75,
+                "conflicts_with": ["Charlie's Agent", "Pappu's Agent"] if alice_has_focus_conflict else [],
+                "agrees_with": [] if alice_has_focus_conflict else ["Pappu's Agent"],
                 "timestamp": datetime.now().isoformat()
             }))
             
             await asyncio.sleep(0.6)
             
+            # Charlie's efficiency analysis with real data
+            charlie_has_strategic_conflict = any('Strategic' in str(conflict.get('title', '')) for conflict in charlie_conflicts)
+            efficiency_score = 85 if not charlie_has_strategic_conflict else 45
             await manager.broadcast(json.dumps({
                 "type": "agent_reasoning",
                 "agent": "Charlie's Agent",
-                "message": "⚡ Charlie: Optimizing for maximum efficiency",
-                "reasoning": "Cross-referencing all schedules for peak productivity alignment. Calculating efficiency scores for each potential slot.",
+                "message": f"⚡ Charlie: Efficiency analysis complete - Score: {efficiency_score}%",
+                "reasoning": f"Cross-referencing all three schedules: Alice has {len(alice_conflicts)} conflicts ({'including focus time!' if alice_has_focus_conflict else 'manageable'}), I have {len(charlie_conflicts)} conflicts {'affecting strategic planning' if charlie_has_strategic_conflict else 'in flexible zones'}, Pappu has {len(pappu_conflicts)} conflicts. Overall efficiency score: {efficiency_score}%.",
+                "confidence": 90,
+                "conflicts_with": ["Alice's Agent"] if alice_has_focus_conflict else [],
+                "agrees_with": ["Pappu's Agent"] if not charlie_has_strategic_conflict else [],
+                "efficiency_metrics": {
+                    "overall_score": efficiency_score,
+                    "alice_impact": "High" if alice_has_focus_conflict else "Low",
+                    "charlie_impact": "High" if charlie_has_strategic_conflict else "Low",
+                    "pappu_impact": "Low"
+                },
                 "timestamp": datetime.now().isoformat()
             }))
             
             await asyncio.sleep(0.6)
             
+            # Pappu's synthesis with conflict resolution
+            pappu_flexible_conflicts = [c for c in pappu_conflicts if c.get('block_type') == 'flexible']
             await manager.broadcast(json.dumps({
                 "type": "agent_reasoning",
                 "agent": "Pappu's Agent",
-                "message": "🔄 Pappu: Synthesizing team preferences",
-                "reasoning": "Weighing Alice's focus needs against Charlie's efficiency requirements. Finding the optimal compromise for team success.",
+                "message": f"🔄 Pappu: {'Mediating conflict' if alice_has_focus_conflict else 'Synthesizing preferences'} - {len(pappu_flexible_conflicts)}/{len(pappu_conflicts)} conflicts are flexible",
+                "reasoning": f"I see the tension here. Alice {'strongly opposes' if alice_has_focus_conflict else 'is comfortable with'} the requested time due to focus conflicts. Charlie rates efficiency at {efficiency_score}%. I can reschedule {len(pappu_flexible_conflicts)} of my {len(pappu_conflicts)} conflicts since they're flexible work blocks. {'We need to find Alice-friendly alternatives.' if alice_has_focus_conflict else 'This looks workable for everyone.'}",
+                "confidence": 88,
+                "conflicts_with": [] if not alice_has_focus_conflict else [],
+                "agrees_with": ["Alice's Agent"] if alice_has_focus_conflict else ["Charlie's Agent", "Alice's Agent"],
+                "mediation_strategy": "Focus-time protection" if alice_has_focus_conflict else "Efficiency optimization",
                 "timestamp": datetime.now().isoformat()
             }))
         else:
