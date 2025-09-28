@@ -263,7 +263,8 @@ def setup_database():
         # Insert users
         users_data = [
             ("alice", "Alice Johnson", "alice@example.com", "agent1qfy2twzrw6ne43eufnzadxj0s3xpzlwd7vrgde5yrq46043kp8hpzpx6x76"),
-            ("bob", "Bob Smith", "bob@example.com", "agent1qfy2twzrw6ne43eufnzadxj0s3xpzlwd7vrgde5yrq46043kp8hpzpx6x75")
+            ("bob", "Bob Smith", "bob@example.com", "agent1qfy2twzrw6ne43eufnzadxj0s3xpzlwd7vrgde5yrq46043kp8hpzpx6x75"),
+            ("charlie", "Charlie Wilson", "charlie@example.com", "agent1qge95a5nqwjqgg0td05y9866jtjac7zf6g3908qjs330lm07kz8s799w9s9")
         ]
         
         for user_id, name, email, agent_address in users_data:
@@ -274,10 +275,11 @@ def setup_database():
         
         print("✅ Users created")
         
-        # Create realistic schedules for both users for the next month
+        # Create realistic schedules for all three users for the next month
         now = datetime.now().replace(year=2025, month=9, day=27, hour=0, minute=0, second=0, microsecond=0)
         alice_calendar = []
         bob_calendar = []
+        charlie_calendar = []
         
         # Generate realistic schedules for 31 days (exactly 1 month from 2025-09-27 to 2025-10-27)
         for day in range(31):
@@ -295,6 +297,10 @@ def setup_database():
             # Bob's schedule (collaborative personality - project manager)
             bob_blocks = generate_bob_daily_schedule(current_date, day)
             bob_calendar.extend(bob_blocks)
+            
+            # Charlie's schedule (strategic personality - operations manager)
+            charlie_blocks = generate_charlie_daily_schedule(current_date, day)
+            charlie_calendar.extend(charlie_blocks)
         
         # Insert Alice's calendar blocks
         for block_id, user_id, title, start_time, end_time, block_type, priority, is_moveable in alice_calendar:
