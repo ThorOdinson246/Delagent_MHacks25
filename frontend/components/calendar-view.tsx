@@ -286,7 +286,7 @@ export function CalendarView() {
                           <div className="space-y-1">
                             {dayEvents.slice(0, 2).map((event) => (
                               <div
-                                key={event.id}
+                                key={event.id || `event-${event.start_time}-${event.end_time}`}
                                 className={`text-xs p-1 rounded border ${getBlockTypeColor(event.block_type)} truncate text-black`}
                                 title={`${event.title} (${event.user_id === "bob" ? "Bob" : "Alice"})`}
                               >
@@ -310,7 +310,7 @@ export function CalendarView() {
                     const isExpanded = expandedBlock === block.id
                     return (
                       <div
-                        key={block.id}
+                        key={block.id || `block-${block.start_time}-${block.end_time}`}
                         className={`rounded-lg border ${getBlockTypeColor(block.block_type)} transition-all duration-300 cursor-pointer ${
                           isExpanded ? "scale-105 shadow-xl ring-2 ring-primary/50" : "hover:scale-[1.02]"
                         }`}
@@ -357,11 +357,6 @@ export function CalendarView() {
                               <div className="text-sm text-black">
                                 <strong>Block Type:</strong> {block.block_type.replace('_', ' ').toUpperCase()}
                               </div>
-                              {block.description && (
-                                <div className="text-sm text-black">
-                                  <strong>Description:</strong> {block.description}
-                                </div>
-                              )}
                             </div>
                           )}
                         </div>
@@ -389,7 +384,7 @@ export function CalendarView() {
                   <div className="text-center py-4 text-muted-foreground">No meeting requests found</div>
                 ) : (
                   meetings.map((meeting) => (
-                    <div key={meeting.id} className="p-4 rounded-lg border border-border/50 bg-background/50 space-y-3">
+                    <div key={meeting.id || `meeting-${meeting.preferred_start_time}-${meeting.preferred_end_time}`} className="p-4 rounded-lg border border-border/50 bg-background/50 space-y-3">
                       <div className="flex items-start justify-between">
                         <h4 className="font-medium">{meeting.title}</h4>
                         <Badge className={getStatusColor(meeting.status)}>{meeting.status}</Badge>
@@ -512,7 +507,7 @@ export function CalendarView() {
                         <div className="space-y-3">
                           {dayEvents.map((block) => (
                             <div
-                              key={block.id}
+                              key={block.id || `block-${block.start_time}-${block.end_time}`}
                               className={`p-4 rounded-lg border ${getBlockTypeColor(block.block_type)}`}
                             >
                               <div className="flex items-center justify-between">
@@ -550,7 +545,7 @@ export function CalendarView() {
                         <div className="space-y-3">
                           {dayMeetings.map((meeting) => (
                             <div
-                              key={meeting.id}
+                              key={meeting.id || `meeting-${meeting.preferred_start_time}-${meeting.preferred_end_time}`}
                               className="p-4 rounded-lg border border-border/50 bg-background/50"
                             >
                               <div className="flex items-center justify-between">

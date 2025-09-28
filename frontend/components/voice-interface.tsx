@@ -118,10 +118,10 @@ export function VoiceInterface() {
       }
       
       // Speak the AI-generated response
-      if (result.spokenResponse) {
-        console.log("AI response:", result.spokenResponse)
+      if (result.voice_response) {
+        console.log("AI response:", result.voice_response)
         if (ttsService) {
-          ttsService.speak(result.spokenResponse, {
+          ttsService.speak(result.voice_response, {
             onEnd: () => console.log("TTS completed"),
             onError: (error) => console.error("TTS error:", error)
           })

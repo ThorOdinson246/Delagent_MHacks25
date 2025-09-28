@@ -13,6 +13,7 @@ export interface TimeSlot {
   day_of_week: string
   date_formatted: string
   time_formatted: string
+  explanation?: string
 }
 
 export interface NegotiationResult {
